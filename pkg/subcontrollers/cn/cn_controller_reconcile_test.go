@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/autoscaling/v2beta2"
+	v2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -88,65 +88,65 @@ func TestStarRocksClusterReconciler_CnResourceCreate(t *testing.T) {
 				},
 				AutoScalingPolicy: &srapi.AutoScalingPolicy{
 					HPAPolicy: &srapi.HPAPolicy{
-						Metrics: []v2beta2.MetricSpec{{
-							Type: v2beta2.PodsMetricSourceType,
-							Object: &v2beta2.ObjectMetricSource{
-								DescribedObject: v2beta2.CrossVersionObjectReference{
+						Metrics: []v2.MetricSpec{{
+							Type: v2.PodsMetricSourceType,
+							Object: &v2.ObjectMetricSource{
+								DescribedObject: v2.CrossVersionObjectReference{
 									Kind:       "statefulset",
 									Name:       "starrockscluster-sample-cn",
-									APIVersion: "apps/v2beta2",
+									APIVersion: "apps/v2",
 								},
-								Target: v2beta2.MetricTarget{
-									Type:               v2beta2.ValueMetricType,
+								Target: v2.MetricTarget{
+									Type:               v2.ValueMetricType,
 									Value:              resource.NewQuantity(5*1024*1024*1024, resource.BinarySI),
 									AverageUtilization: rutils.GetInt32Pointer(1),
 								},
-								Metric: v2beta2.MetricIdentifier{
+								Metric: v2.MetricIdentifier{
 									Name: "test",
 									Selector: &metav1.LabelSelector{
 										MatchLabels: make(map[string]string),
 									},
 								},
 							},
-							Pods: &v2beta2.PodsMetricSource{
-								Metric: v2beta2.MetricIdentifier{
+							Pods: &v2.PodsMetricSource{
+								Metric: v2.MetricIdentifier{
 									Name: "test",
 									Selector: &metav1.LabelSelector{
 										MatchLabels: make(map[string]string),
 									},
 								},
-								Target: v2beta2.MetricTarget{
-									Type:               v2beta2.ValueMetricType,
+								Target: v2.MetricTarget{
+									Type:               v2.ValueMetricType,
 									Value:              resource.NewQuantity(5*1024*1024*1024, resource.BinarySI),
 									AverageUtilization: rutils.GetInt32Pointer(1),
 								},
 							},
-							Resource: &v2beta2.ResourceMetricSource{
+							Resource: &v2.ResourceMetricSource{
 								Name: "test",
-								Target: v2beta2.MetricTarget{
-									Type:               v2beta2.ValueMetricType,
+								Target: v2.MetricTarget{
+									Type:               v2.ValueMetricType,
 									Value:              resource.NewQuantity(5*1024*1024*1024, resource.BinarySI),
 									AverageUtilization: rutils.GetInt32Pointer(1),
 								},
 							},
-							ContainerResource: &v2beta2.ContainerResourceMetricSource{
+							ContainerResource: &v2.ContainerResourceMetricSource{
 								Name: "test",
-								Target: v2beta2.MetricTarget{
-									Type:               v2beta2.ValueMetricType,
+								Target: v2.MetricTarget{
+									Type:               v2.ValueMetricType,
 									Value:              resource.NewQuantity(5*1024*1024*1024, resource.BinarySI),
 									AverageUtilization: rutils.GetInt32Pointer(1),
 								},
 								Container: "test",
 							},
-							External: &v2beta2.ExternalMetricSource{
-								Metric: v2beta2.MetricIdentifier{
+							External: &v2.ExternalMetricSource{
+								Metric: v2.MetricIdentifier{
 									Name: "test",
 									Selector: &metav1.LabelSelector{
 										MatchLabels: make(map[string]string),
 									},
 								},
-								Target: v2beta2.MetricTarget{
-									Type:               v2beta2.ValueMetricType,
+								Target: v2.MetricTarget{
+									Type:               v2.ValueMetricType,
 									Value:              resource.NewQuantity(5*1024*1024*1024, resource.BinarySI),
 									AverageUtilization: rutils.GetInt32Pointer(1),
 								},

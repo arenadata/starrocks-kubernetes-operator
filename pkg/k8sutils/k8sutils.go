@@ -26,6 +26,7 @@ import (
 	"unicode"
 
 	"github.com/go-logr/logr"
+	"github.com/go-viper/encoding/javaproperties"
 	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/util/retry"
@@ -375,18 +376,12 @@ func DeleteAutoscaler(ctx context.Context, k8sClient client.Client, namespace, n
 		logger := logr.FromContextOrDiscard(ctx)
 		logger.Info("error when get HPA object", "error", err)
 		// If we mistakenly determine the type of HPA, we will receive an error message similar
-		// to "no matches for kind 'HorizontalPodAutoscaler' in version 'autoscaling/v2beta2'".
+		// to "no matches for kind 'HorizontalPodAutoscaler' in version 'autoscaling/v2'".
 		// This error cannot be identified through apierrors, and using string comparison to
 		// determine if it is this error is not a good approach.
 		// Therefore, our temporary solution is to always switch to another version of HPA for deletion.
-		wrongVersion := version
-		if wrongVersion == srapi.AutoScalerV2Beta2 {
-			err = k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace},
-				srapi.AutoScalerV2.CreateEmptyHPA(KUBE_MAJOR_VERSION, KUBE_MINOR_VERSION))
-		} else { // HPA v2 exists in higher version of k8s
-			err = k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace},
-				srapi.AutoScalerV2Beta2.CreateEmptyHPA(KUBE_MAJOR_VERSION, KUBE_MINOR_VERSION))
-		}
+		err = k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace},
+			srapi.AutoScalerV2.CreateEmptyHPA(KUBE_MAJOR_VERSION, KUBE_MINOR_VERSION))
 		if apierrors.IsNotFound(err) {
 			return nil
 		} else if err != nil {
@@ -638,8 +633,14 @@ func ResolveConfigMap(configMap *corev1.ConfigMap, key string) (map[string]inter
 	value := data[key]
 
 	// We use a new viper instance, not the global one, in order to avoid concurrency problems: concurrent map iteration
-	// and map write,
-	v := viper.New()
+	// and map write.
+	// As of viper v1.20 the "properties" codec is no longer bundled, so register the externalized
+	// java properties codec explicitly on this instance.
+	codecRegistry := viper.NewCodecRegistry()
+	if err := codecRegistry.RegisterCodec("properties", &javaproperties.Codec{}); err != nil {
+		return nil, err
+	}
+	v := viper.NewWithOptions(viper.WithCodecRegistry(codecRegistry))
 	v.SetConfigType("properties")
 	if err := v.ReadConfig(bytes.NewBuffer([]byte(value))); err != nil {
 		return nil, err

@@ -73,9 +73,12 @@ func Test_ClearResources(t *testing.T) {
 	now := metav1.NewTime(time.Now())
 	src := &srapi.StarRocksCluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:              "test",
-			Namespace:         "default",
+			Name:      "test",
+			Namespace: "default",
+			// The fake client (controller-runtime >= 0.20) refuses to create an object that has a
+			// deletionTimestamp set but no finalizers, matching real apiserver behavior.
 			DeletionTimestamp: &now,
+			Finalizers:        []string{"starrocks.com/test"},
 		},
 		Spec: srapi.StarRocksClusterSpec{},
 		Status: srapi.StarRocksClusterStatus{

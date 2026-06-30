@@ -104,7 +104,7 @@ func TestHashObject(t *testing.T) {
 					Status: corev1.ServiceStatus{},
 				},
 			},
-			want: "749390023",
+			want: "2138780051",
 		},
 		{
 			name: "test hash object 5",

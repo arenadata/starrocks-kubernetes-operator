@@ -26,12 +26,6 @@ func TestAutoScalerVersion_Complete(t *testing.T) {
 			want:    AutoScalerV2,
 		},
 		{
-			name:    "test for version v2beta2",
-			version: AutoScalerV2Beta2,
-			args:    args{},
-			want:    AutoScalerV2Beta2,
-		},
-		{
 			name:    "test for empty version",
 			version: "",
 			args: args{
@@ -41,22 +35,24 @@ func TestAutoScalerVersion_Complete(t *testing.T) {
 			want: AutoScalerV2,
 		},
 		{
+			// empty version always defaults to v2 now, regardless of the kubernetes minor version
 			name:    "test for empty version2",
 			version: "",
 			args: args{
 				major: "1",
 				minor: "25",
 			},
-			want: AutoScalerV2Beta2,
+			want: AutoScalerV2,
 		},
 		{
+			// empty version always defaults to v2 now, regardless of the kubernetes minor version
 			name:    "test for empty version3",
 			version: "",
 			args: args{
 				major: "1",
 				minor: "23",
 			},
-			want: AutoScalerV2Beta2,
+			want: AutoScalerV2,
 		},
 	}
 	for _, tt := range tests {

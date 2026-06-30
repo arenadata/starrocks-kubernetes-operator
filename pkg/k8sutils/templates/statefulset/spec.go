@@ -50,7 +50,7 @@ func PVCList(volumes []v1.StorageVolume) []corev1.PersistentVolumeClaim {
 			},
 		}
 		if vm.StorageSize != "" {
-			pvc.Spec.Resources = corev1.ResourceRequirements{
+			pvc.Spec.Resources = corev1.VolumeResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceStorage: resource.MustParse(vm.StorageSize),
 				},
