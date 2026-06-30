@@ -4,18 +4,19 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"k8s.io/apimachinery/pkg/api/meta"
-	controllerruntime "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	v1 "github.com/StarRocks/starrocks-kubernetes-operator/pkg/apis/starrocks/v1"
 	"github.com/StarRocks/starrocks-kubernetes-operator/pkg/k8sutils/fake"
+
+	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/api/meta"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 )
 
 func TestSetupClusterReconciler(t *testing.T) {
 	type args struct {
-		mgr controllerruntime.Manager
+		mgr ctrl.Manager
 	}
 	tests := []struct {
 		name    string
@@ -25,7 +26,7 @@ func TestSetupClusterReconciler(t *testing.T) {
 		{
 			name: "test setup cluster reconciler",
 			args: args{
-				mgr: func() controllerruntime.Manager {
+				mgr: func() ctrl.Manager {
 					env := fake.NewEnvironment(fake.WithClusterCRD())
 					defer func() {
 						err := env.Stop()
@@ -42,7 +43,7 @@ func TestSetupClusterReconciler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := SetupClusterReconciler(tt.args.mgr, ""); (err != nil) != tt.wantErr {
+			if err := SetupClusterReconciler(tt.args.mgr); (err != nil) != tt.wantErr {
 				t.Errorf("SetupClusterReconciler() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -51,7 +52,12 @@ func TestSetupClusterReconciler(t *testing.T) {
 
 func TestSetupWarehouseReconciler(t *testing.T) {
 	env1 := fake.NewEnvironment(fake.WithClusterCRD())
+	mgr1 := fake.NewManager(env1)
+	ctrl.NewControllerManagedBy(mgr1).WithOptions(controller.Options{SkipNameValidation: new(true)})
+
 	env2 := fake.NewEnvironment(fake.WithClusterCRD(), fake.WithWarehouseCRD())
+	mgr2 := fake.NewManager(env2)
+
 	defer func() {
 		err := env1.Stop()
 		assert.Nil(t, err)
@@ -59,41 +65,26 @@ func TestSetupWarehouseReconciler(t *testing.T) {
 		assert.Nil(t, err)
 	}()
 
-	type args struct {
-		mgr       controllerruntime.Manager
-		namespace string
-	}
 	tests := []struct {
 		name    string
-		args    args
+		mgr     ctrl.Manager
 		wantErr bool
 	}{
 		{
-			name: "test setup warehouse reconciler with no warehouse CRD",
-			args: args{
-				mgr: func() controllerruntime.Manager {
-					env1 = fake.NewEnvironment(fake.WithClusterCRD())
-					return fake.NewManager(env1)
-				}(),
-				namespace: "",
-			},
+			name:    "test setup warehouse reconciler with no warehouse CRD",
+			mgr:     mgr1,
 			wantErr: false,
 		},
 		{
-			name: "test setup warehouse reconciler with warehouse CRD",
-			args: args{
-				mgr: func() controllerruntime.Manager {
-					return fake.NewManager(env2)
-				}(),
-				namespace: "",
-			},
+			name:    "test setup warehouse reconciler with warehouse CRD",
+			mgr:     mgr2,
 			wantErr: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := SetupWarehouseReconciler(tt.args.mgr, tt.args.namespace, ""); (err != nil) != tt.wantErr {
+			if err := (&StarRocksWarehouseReconciler{}).SetupWithManager(tt.mgr); (err != nil) != tt.wantErr {
 				t.Errorf("SetupWarehouseReconciler() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

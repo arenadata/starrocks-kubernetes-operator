@@ -1,0 +1,51 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: starrocks-operator-manager
+  namespace: '{{ .Release.Namespace }}'
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - starrocks.com
+  resources:
+  - starrocksclusters
+  - starrockswarehouses
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - starrocks.com
+  resources:
+  - starrocksclusters/finalizers
+  - starrockswarehouses/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - starrocks.com
+  resources:
+  - starrocksclusters/status
+  - starrockswarehouses/status
+  verbs:
+  - get
+  - patch
+  - update

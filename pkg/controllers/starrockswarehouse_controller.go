@@ -38,22 +38,15 @@ type StarRocksWarehouseReconciler struct {
 	client.Client
 	recorder       record.EventRecorder
 	subControllers []subcontrollers.WarehouseSubController
-	denyList       string
 }
 
-// +kubebuilder:rbac:groups=starrocks.com,resources=starrockswarehouses,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=starrocks.com,resources=starrockswarehouses/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=starrocks.com,resources=starrockswarehouses/finalizers,verbs=update
-// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
-// +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch
-// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalers,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="core",resources=endpoints,verbs=get;watch;list
-// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch
+// MANAGER role: the operator only needs the following permissions on the warehouse CR in its
+// OWN namespace. These markers are rendered into the operator chart manager_role.yaml with a
+// namespace of {{ .Release.Namespace }}.
+
+// +kubebuilder:rbac:namespace="{{ .Release.Namespace }}",groups=starrocks.com,resources=starrockswarehouses,verbs=get;list;watch
+// +kubebuilder:rbac:namespace="{{ .Release.Namespace }}",groups=starrocks.com,resources=starrockswarehouses/status,verbs=get;update;patch
+// +kubebuilder:rbac:namespace="{{ .Release.Namespace }}",groups=starrocks.com,resources=starrockswarehouses/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -66,9 +59,9 @@ func (r *StarRocksWarehouseReconciler) Reconcile(ctx context.Context, req ctrl.R
 	logger.Info("begin to reconcile StarRocksWarehouse")
 
 	logger.Info("get StarRocksWarehouse CR from kubernetes")
+
 	warehouse := &srapi.StarRocksWarehouse{}
-	client := r.Client
-	err := client.Get(ctx, req.NamespacedName, warehouse)
+	err := r.Get(ctx, req.NamespacedName, warehouse)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			logger.Info("StarRocksWarehouse CR is not found, maybe deleted, begin to clear warehouse")
@@ -103,9 +96,8 @@ func (r *StarRocksWarehouseReconciler) Reconcile(ctx context.Context, req ctrl.R
 			}
 			if handled {
 				return ctrl.Result{}, nil
-			} else {
-				return ctrl.Result{}, err
 			}
+			return ctrl.Result{}, err
 		}
 	}
 
@@ -138,12 +130,11 @@ func (r *StarRocksWarehouseReconciler) Reconcile(ctx context.Context, req ctrl.R
 func (r *StarRocksWarehouseReconciler) UpdateStarRocksWarehouseStatus(ctx context.Context, warehouse *srapi.StarRocksWarehouse) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		actualWarehouse := &srapi.StarRocksWarehouse{}
-		client := r.Client
-		if err := client.Get(ctx, types.NamespacedName{Namespace: warehouse.Namespace, Name: warehouse.Name}, actualWarehouse); err != nil {
+		if err := r.Get(ctx, types.NamespacedName{Namespace: warehouse.Namespace, Name: warehouse.Name}, actualWarehouse); err != nil {
 			return err
 		}
 		actualWarehouse.Status = warehouse.Status
-		return client.Status().Update(ctx, actualWarehouse)
+		return r.Status().Update(ctx, actualWarehouse)
 	})
 }
 

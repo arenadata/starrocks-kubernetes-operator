@@ -61,16 +61,24 @@ help: ## Display this help.
 
 ##@ Development
 
+OPERATOR_ROLES_DIR = helm-charts/charts/kube-starrocks/charts/operator/roles
+
 .PHONY: manifests
-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects in config/crd/bases and deploy.
-	@$(CONTROLLER_GEN) rbac:roleName=starrocks-manager crd webhook paths="./pkg/apis/..." output:crd:artifacts:config=config/crd/bases
-	@$(CONTROLLER_GEN) rbac:roleName=starrocks-manager crd:maxDescLen=0 webhook paths="./pkg/apis/..." output:crd:artifacts:config=deploy/ output:rbac:artifacts:config=deploy/
+manifests: controller-gen ## Generate WebhookConfiguration, RBAC Roles and CustomResourceDefinition objects.
+	@mkdir -p $(OPERATOR_ROLES_DIR)
+	@$(CONTROLLER_GEN) crd webhook paths="./pkg/apis/..." output:crd:artifacts:config=config/crd/bases
+	@$(CONTROLLER_GEN) crd:maxDescLen=0 webhook paths="./pkg/apis/..." output:crd:artifacts:config=deploy/
+	@$(CONTROLLER_GEN) rbac:roleName=starrocks-operator-manager,fileName=manager_role.yaml paths="./pkg/controllers" output:rbac:artifacts:config=$(OPERATOR_ROLES_DIR)
+	@$(CONTROLLER_GEN) rbac:roleName=starrocks-operator-managed,fileName=managed_role.yaml paths="./pkg/apis/..." output:rbac:artifacts:config=$(OPERATOR_ROLES_DIR)
 
 .PHONY: ci-manifests
-ci-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects in config/crd/bases and deploy.
-	@$(CONTROLLER_GEN) rbac:roleName=starrocks-manager crd webhook paths="./pkg/apis/..." output:crd:artifacts:config=config/crd/bases
-	@$(CONTROLLER_GEN) rbac:roleName=starrocks-manager crd:maxDescLen=0 webhook paths="./pkg/apis/..." output:crd:artifacts:config=deploy/ output:rbac:artifacts:config=deploy/
-	@git status | grep "starrocks.com_starrocksclusters.yaml" && echo "the crd file need to be updated" && exit 1 || exit 0
+ci-manifests: controller-gen ## Generate manifests and fail if any of them drift.
+	@mkdir -p $(OPERATOR_ROLES_DIR)
+	@$(CONTROLLER_GEN) crd webhook paths="./pkg/apis/..." output:crd:artifacts:config=config/crd/bases
+	@$(CONTROLLER_GEN) crd:maxDescLen=0 webhook paths="./pkg/apis/..." output:crd:artifacts:config=deploy/
+	@$(CONTROLLER_GEN) rbac:roleName=starrocks-operator-manager,fileName=manager_role.yaml paths="./pkg/controllers" output:rbac:artifacts:config=$(OPERATOR_ROLES_DIR)
+	@$(CONTROLLER_GEN) rbac:roleName=starrocks-operator-managed,fileName=managed_role.yaml paths="./pkg/apis/..." output:rbac:artifacts:config=$(OPERATOR_ROLES_DIR)
+	@git status --porcelain | grep -E "starrocks.com_starrocksclusters.yaml|starrocks.com_starrockswarehouses.yaml|roles/manager_role.yaml|roles/managed_role.yaml" && echo "the generated manifests need to be updated" && exit 1 || exit 0
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
