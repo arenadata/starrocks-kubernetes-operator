@@ -3,19 +3,13 @@
 # Run the following command from the root dir of the git repo:
 #   > DOCKER_BUILDKIT=1 docker build -t starrocks/operator:tag .
 
-FROM golang:1.22 as build
-ARG LDFLAGS
-WORKDIR /go/src/app
+FROM golang:1.26 as build
+WORKDIR /app
 COPY . .
 
-# Build the binary
-# if vendor directory exists, add -mod=vendor flag
-RUN if [ -d vendor ]; then \
-    CGO_ENABLED=0 GOOS=linux go build -mod=vendor -ldflags="${LDFLAGS:-}" -o /app/sroperator cmd/main.go; \
-    else \
-    CGO_ENABLED=0 GOOS=linux go build -ldflags="${LDFLAGS:-}" -o /app/sroperator cmd/main.go; \
-    fi
+# Build the binary in module mode (vendor/ is no longer used).
+RUN CGO_ENABLED=0 GOOS=linux go build -mod=mod -ldflags="-s -w" -trimpath -o /app/manager cmd/main.go
 
-FROM starrocks/static-debian11:nonroot
-COPY --from=build /app/sroperator /sroperator
-CMD ["/sroperator"]
+FROM scartch
+COPY --from=build /app/manager /manager
+CMD ["/manager"]

@@ -7,6 +7,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	v1 "github.com/StarRocks/starrocks-kubernetes-operator/pkg/apis/starrocks/v1"
 	"github.com/StarRocks/starrocks-kubernetes-operator/pkg/subcontrollers"
@@ -103,8 +104,10 @@ func NewManager(env *envtest.Environment) ctrl.Manager {
 	}
 
 	mgr, err := manager.New(env.Config, manager.Options{
-		MetricsBindAddress: "0",
-		Scheme:             v1.Scheme,
+		Metrics: metricsserver.Options{
+			BindAddress: "0",
+		},
+		Scheme: v1.Scheme,
 	})
 	if err != nil {
 		panic(err)

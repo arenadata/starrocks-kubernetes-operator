@@ -21,7 +21,6 @@ import (
 
 	v1 "k8s.io/api/autoscaling/v1"
 	v2 "k8s.io/api/autoscaling/v2"
-	"k8s.io/api/autoscaling/v2beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -73,9 +72,8 @@ func BuildHPA(hpaParams *HPAParams, autoScalerVersion srapi.AutoScalerVersion) c
 		switch version {
 		case srapi.AutoScalerV1:
 			meta.APIVersion = v1.SchemeGroupVersion.String()
-		case srapi.AutoScalerV2Beta2:
-			meta.APIVersion = v2beta2.SchemeGroupVersion.String()
 		case srapi.AutoScalerV2:
+			// v2beta2 was removed from the kubernetes API server in 1.26; it is treated as autoscaling/v2.
 			meta.APIVersion = v2.SchemeGroupVersion.String()
 		}
 		return meta
@@ -107,37 +105,20 @@ func BuildHPA(hpaParams *HPAParams, autoScalerVersion srapi.AutoScalerVersion) c
 				MinReplicas:    hpaParams.ScalerPolicy.MinReplicas,
 			},
 		}
-	case srapi.AutoScalerV2:
+	default:
+		// case srapi.AutoScalerV2, srapi.AutoScalerV2Beta2:
+		// v2beta2 was removed from the kubernetes API server in 1.26; it is treated as autoscaling/v2.
 		hpa := &v2.HorizontalPodAutoscaler{
 			TypeMeta:   getTypeMeta(autoScalerVersion),
 			ObjectMeta: getObjectMeta(hpaParams),
 			Spec: v2.HorizontalPodAutoscalerSpec{
+				// scaleTargetRef is a v1.CrossVersionObjectReference; the v2 struct is field-compatible.
 				ScaleTargetRef: *((*v2.CrossVersionObjectReference)(unsafe.Pointer(scaleTargetRef))),
 				MaxReplicas:    hpaParams.ScalerPolicy.MaxReplicas,
 				MinReplicas:    hpaParams.ScalerPolicy.MinReplicas,
 			},
 		}
-		// the codes use unsafe.Pointer to convert struct, when audit please notice the correctness about memory assign.
-		if hpaParams.ScalerPolicy != nil && hpaParams.ScalerPolicy.HPAPolicy != nil {
-			if len(hpaParams.ScalerPolicy.HPAPolicy.Metrics) != 0 {
-				metrics := unsafe.Slice((*v2.MetricSpec)(unsafe.Pointer(&hpaParams.ScalerPolicy.HPAPolicy.Metrics[0])),
-					len(hpaParams.ScalerPolicy.HPAPolicy.Metrics))
-				hpa.Spec.Metrics = metrics
-			}
-			hpa.Spec.Behavior = (*v2.HorizontalPodAutoscalerBehavior)(unsafe.Pointer(hpaParams.ScalerPolicy.HPAPolicy.Behavior))
-		}
-		return hpa
-	default:
-		// case srapi.AutoScalerV2Beta2:
-		hpa := &v2beta2.HorizontalPodAutoscaler{
-			TypeMeta:   getTypeMeta(autoScalerVersion),
-			ObjectMeta: getObjectMeta(hpaParams),
-			Spec: v2beta2.HorizontalPodAutoscalerSpec{
-				ScaleTargetRef: *((*v2beta2.CrossVersionObjectReference)(unsafe.Pointer(scaleTargetRef))),
-				MaxReplicas:    hpaParams.ScalerPolicy.MaxReplicas,
-				MinReplicas:    hpaParams.ScalerPolicy.MinReplicas,
-			},
-		}
+		// HPAPolicy now holds autoscaling/v2 types, so these are direct assignments.
 		if hpaParams.ScalerPolicy != nil && hpaParams.ScalerPolicy.HPAPolicy != nil {
 			hpa.Spec.Metrics = hpaParams.ScalerPolicy.HPAPolicy.Metrics
 			hpa.Spec.Behavior = hpaParams.ScalerPolicy.HPAPolicy.Behavior

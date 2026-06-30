@@ -34,9 +34,6 @@ Resource Types:
 </tr><tr><td><p>&#34;v2&#34;</p></td>
 <td><p>AutoScalerV2 the cn service use v2. Reference to  <a href="https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/">https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/</a></p>
 </td>
-</tr><tr><td><p>&#34;v2beta2&#34;</p></td>
-<td><p>AutoScalerV2Beta2 the cn service use v2beta2. Reference to  <a href="https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/">https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/</a></p>
-</td>
 </tr></tbody>
 </table>
 <h3 id="starrocks.com/v1.AutoScalingPolicy">AutoScalingPolicy
@@ -79,7 +76,8 @@ AutoScalerVersion
 </td>
 <td>
 <em>(Optional)</em>
-<p>version represents the autoscaler version for cn service. only support v1,v2beta2,v2</p>
+<p>version represents the autoscaler version for cn service. valid values are v1 and v2. v2beta2 is
+deprecated (removed from the kubernetes API server in 1.26) and, if set, is treated as v2.</p>
 </td>
 </tr>
 <tr>
@@ -390,15 +388,15 @@ If the observed generation is less than the generation, it will trigger disaster
 <td>
 <code>metrics</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.24/#metricspec-v2beta2-autoscaling">
-[]Kubernetes autoscaling/v2beta2.MetricSpec
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.24/#metricspec-v2-autoscaling">
+[]Kubernetes autoscaling/v2.MetricSpec
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
 <p>Metrics specifies how to scale based on a single metric
-the struct copy from k8s.io/api/autoscaling/v2beta2/types.go. the redundancy code will hide the restriction about
+the struct copy from k8s.io/api/autoscaling/v2/types.go. the redundancy code will hide the restriction about
 HorizontalPodAutoscaler version and kubernetes releases matching issue.
 the splice will have unsafe.Pointer convert, so be careful to edit the struct fields.</p>
 </td>
@@ -407,15 +405,15 @@ the splice will have unsafe.Pointer convert, so be careful to edit the struct fi
 <td>
 <code>behavior</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.24/#horizontalpodautoscalerbehavior-v2beta2-autoscaling">
-Kubernetes autoscaling/v2beta2.HorizontalPodAutoscalerBehavior
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.24/#horizontalpodautoscalerbehavior-v2-autoscaling">
+Kubernetes autoscaling/v2.HorizontalPodAutoscalerBehavior
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
 <p>HorizontalPodAutoscalerBehavior configures the scaling behavior of the target.
-the struct copy from k8s.io/api/autoscaling/v2beta2/types.go. the redundancy code will hide the restriction about
+the struct copy from k8s.io/api/autoscaling/v2/types.go. the redundancy code will hide the restriction about
 HorizontalPodAutoscaler version and kubernetes releases matching issue.
 the</p>
 </td>
@@ -2645,5 +2643,5 @@ AutoScalingPolicy
 <hr/>
 <p><em>
 Generated with <code>gen-crd-api-reference-docs</code>
-on git commit <code>e9f3a7c9</code>.
+on git commit <code>850a864</code>.
 </em></p>

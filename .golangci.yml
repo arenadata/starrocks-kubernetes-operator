@@ -90,6 +90,15 @@ linters:
           - goconst
           - lll
         path: _test\.go
+      # Deprecations surfaced by the k8s v0.36 / controller-runtime v0.24 upgrade.
+      # Migrating off them (new events API, Endpoints -> EndpointSlice) is tracked as a follow-up.
+      - linters:
+          - staticcheck
+        text: 'SA1019:.*(GetEventRecorderFor|scheme\.Builder|Endpoints is deprecated|EndpointSubset is deprecated)'
+      # scripts/ holds standalone maintenance tools, not part of the operator binary.
+      - linters:
+          - gosec
+        path: scripts/
       - path: pkg/golinters/errcheck.go
         text: 'SA1019: errCfg.Exclude is deprecated: use ExcludeFunctions instead'
       - path: pkg/commands/run.go

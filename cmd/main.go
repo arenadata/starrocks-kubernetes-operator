@@ -22,8 +22,10 @@ import (
 	"time"
 
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	"github.com/StarRocks/starrocks-kubernetes-operator/cmd/config"
 	srapi "github.com/StarRocks/starrocks-kubernetes-operator/pkg/apis/starrocks/v1"
@@ -62,15 +64,25 @@ func main() {
 	srapi.Register()
 
 	duration := 2 * time.Minute
+	cacheOptions := cache.Options{
+		SyncPeriod: &duration,
+	}
+	// If a namespace is specified, restrict the cache to watch objects in that namespace only.
+	// Otherwise, leave DefaultNamespaces nil to watch all namespaces.
+	if _namespace != "" {
+		cacheOptions.DefaultNamespaces = map[string]cache.Config{
+			_namespace: {},
+		}
+	}
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 srapi.Scheme,
-		MetricsBindAddress:     _metricsAddr,
-		Port:                   9443,
-		SyncPeriod:             &duration,
+		Scheme: srapi.Scheme,
+		Metrics: metricsserver.Options{
+			BindAddress: _metricsAddr,
+		},
+		Cache:                  cacheOptions,
 		HealthProbeBindAddress: _probeAddr,
 		LeaderElection:         _enableLeaderElection,
 		LeaderElectionID:       "c6c79638.starrocks.com",
-		Namespace:              _namespace,
 	})
 	if err != nil {
 		logger.Error(err, "unable to start manager")

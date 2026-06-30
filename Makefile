@@ -1,7 +1,7 @@
 
 # Image URL to use all building/pushing image targets
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.25
+ENVTEST_K8S_VERSION = 1.34
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -86,7 +86,7 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
-	@KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" GOFLAGS="-mod=vendor" go test \
+	@KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" GOFLAGS="-mod=mod" go test \
 		github.com/StarRocks/starrocks-kubernetes-operator/pkg/common/... 			\
 		github.com/StarRocks/starrocks-kubernetes-operator/pkg/controllers/... 		\
 		github.com/StarRocks/starrocks-kubernetes-operator/pkg/k8sutils/... 		\
@@ -144,12 +144,12 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 CONTROLLER_GEN = $(GOBIN)/controller-gen
 .PHONY: controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
-	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.14.0)
+	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.20.0)
 
 KUSTOMIZE = $(GOBIN)/kustomize
 .PHONY: kustomize
 kustomize: ## Download kustomize locally if necessary.
-	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4@v4.5.7)
+	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v5@v5.4.3)
 
 ENVTEST = $(GOBIN)/setup-envtest
 .PHONY: envtest
