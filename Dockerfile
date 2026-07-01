@@ -7,9 +7,12 @@ FROM golang:1.26 as build
 WORKDIR /app
 COPY . .
 
-# Build the binary in module mode (vendor/ is no longer used).
-RUN CGO_ENABLED=0 GOOS=linux go build -mod=mod -ldflags="-s -w" -trimpath -o /app/manager cmd/main.go
+# LDFLAGS is passed by CI / `make docker` to stamp version metadata; defaults to a stripped build.
+ARG LDFLAGS="-s -w"
 
-FROM scartch
+# Build the binary in module mode (vendor/ is no longer used).
+RUN CGO_ENABLED=0 GOOS=linux go build -mod=mod -ldflags="$LDFLAGS" -trimpath -o /app/manager cmd/main.go
+
+FROM scratch
 COPY --from=build /app/manager /manager
 CMD ["/manager"]
