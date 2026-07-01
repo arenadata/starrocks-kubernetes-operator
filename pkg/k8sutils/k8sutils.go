@@ -447,6 +447,7 @@ func GetKubernetesVersion() error {
 		return err
 	}
 
+	// TODO: AD we can use discoveryClient.ServerGroupsAndResources() to select for HPA version
 	// query the version information of the API server
 	version, err := discoveryClient.ServerVersion()
 	if err != nil {

@@ -2,7 +2,6 @@ package predicates
 
 import (
 	"fmt"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -17,25 +16,13 @@ const (
 )
 
 // GenericPredicates implements predicate.Predicate for filtering events.
-// The deny list is cached at initialization time for better performance.
 type GenericPredicates struct {
 	predicate.Funcs
-	denyList map[string]struct{}
 }
 
-// NewGenericPredicates creates a new GenericPredicates with the given deny list.
-// The denyList parameter is a comma-separated string of namespace names.
-func NewGenericPredicates(denyList string) GenericPredicates {
-	denyMap := make(map[string]struct{})
-	if denyList != "" {
-		for _, ns := range strings.Split(denyList, ",") {
-			trimmed := strings.TrimSpace(ns)
-			if trimmed != "" {
-				denyMap[trimmed] = struct{}{}
-			}
-		}
-	}
-	return GenericPredicates{denyList: denyMap}
+// NewGenericPredicates creates a new GenericPredicates.
+func NewGenericPredicates() GenericPredicates {
+	return GenericPredicates{}
 }
 
 // Create returns true if the Create event should be processed
@@ -58,38 +45,13 @@ func (gp GenericPredicates) Generic(e event.GenericEvent) bool {
 	return gp.shouldReconcile(e.Object)
 }
 
-// shouldReconcile checks if an object should be reconciled based on namespace and annotation filters
+// shouldReconcile checks if an object should be reconciled based on annotation filters
 func (gp GenericPredicates) shouldReconcile(obj client.Object) bool {
 	if obj == nil {
 		return false
 	}
 
-	// Check namespace deny list
-	if !gp.isNamespaceAllowed(obj) {
-		return false
-	}
-
-	// Check ignored annotation
-	if !isObjectAllowed(obj) {
-		return false
-	}
-
-	return true
-}
-
-// isNamespaceAllowed returns true if the object's namespace is not in the deny list
-func (gp GenericPredicates) isNamespaceAllowed(obj client.Object) bool {
-	if len(gp.denyList) == 0 {
-		return true
-	}
-
-	if _, denied := gp.denyList[obj.GetNamespace()]; denied {
-		logger := log.Log.WithName("predicates")
-		logger.Info("starrocks operator will not reconcile namespace, update --deny-list to reconcile",
-			"namespace", obj.GetNamespace())
-		return false
-	}
-	return true
+	return isObjectAllowed(obj)
 }
 
 // isObjectAllowed returns true if the object does not have the ignored annotation set to "true"

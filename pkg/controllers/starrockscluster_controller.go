@@ -42,22 +42,17 @@ type StarRocksClusterReconciler struct {
 	client.Client
 	Recorder record.EventRecorder
 	Scs      []subcontrollers.ClusterSubController
-	denyList string
 }
 
-// +kubebuilder:rbac:groups=starrocks.com,resources=starrocksclusters,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=starrocks.com,resources=starrocksclusters/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=starrocks.com,resources=starrocksclusters/finalizers,verbs=update
-// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
-// +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch
-// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalers,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="core",resources=endpoints,verbs=get;watch;list
-// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch
+// MANAGER role: the operator only needs the following permissions in its OWN namespace.
+// These markers are scanned by `controller-gen rbac ... paths=./pkg/controllers` and rendered
+// into the operator chart manager_role.yaml with a namespace of {{ .Release.Namespace }}.
+
+// +kubebuilder:rbac:namespace="{{ .Release.Namespace }}",groups=core,resources=events,verbs=create;patch
+// +kubebuilder:rbac:namespace="{{ .Release.Namespace }}",groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:namespace="{{ .Release.Namespace }}",groups=starrocks.com,resources=starrocksclusters,verbs=get;list;watch
+// +kubebuilder:rbac:namespace="{{ .Release.Namespace }}",groups=starrocks.com,resources=starrocksclusters/status,verbs=get;update;patch
+// +kubebuilder:rbac:namespace="{{ .Release.Namespace }}",groups=starrocks.com,resources=starrocksclusters/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -69,9 +64,9 @@ func (r *StarRocksClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	logger.Info("begin to reconcile StarRocksCluster")
 
 	logger.Info("get StarRocksCluster CR from kubernetes")
-	var esrc srapi.StarRocksCluster
-	client := r.Client
-	err := client.Get(ctx, req.NamespacedName, &esrc)
+
+	esrc := new(srapi.StarRocksCluster)
+	err := r.Get(ctx, req.NamespacedName, esrc)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return ctrl.Result{}, nil
@@ -79,10 +74,9 @@ func (r *StarRocksClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		logger.Error(err, "get StarRocksCluster object failed")
 		return requeueIfError(err)
 	}
-	src := esrc.DeepCopy()
 
 	// reconcile src deleted
-	if !src.DeletionTimestamp.IsZero() {
+	if !esrc.DeletionTimestamp.IsZero() {
 		logger.Info("deletion timestamp is not zero, clear StarRocksCluster related resources")
 		return ctrl.Result{}, nil
 	}
@@ -91,10 +85,10 @@ func (r *StarRocksClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	for _, rc := range r.Scs {
 		kvs := []interface{}{"subController", rc.GetControllerName()}
 		logger.Info("sub controller sync spec", kvs...)
-		if err = rc.SyncCluster(ctx, src); err != nil {
+		if err = rc.SyncCluster(ctx, esrc); err != nil {
 			logger.Error(err, "sub controller reconciles spec failed", kvs...)
-			handleSyncClusterError(src, rc, err)
-			if updateError := r.UpdateStarRocksClusterStatus(ctx, src); updateError != nil {
+			handleSyncClusterError(esrc, rc, err)
+			if updateError := r.UpdateStarRocksClusterStatus(ctx, esrc); updateError != nil {
 				logger.Error(updateError, "failed to update StarRocksCluster Status")
 			}
 			return requeueIfError(err)
@@ -104,10 +98,10 @@ func (r *StarRocksClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	for _, rc := range r.Scs {
 		kvs := []interface{}{"subController", rc.GetControllerName()}
 		logger.Info("sub controller update status", kvs...)
-		if err = rc.UpdateClusterStatus(ctx, src); err != nil {
+		if err = rc.UpdateClusterStatus(ctx, esrc); err != nil {
 			logger.Error(err, "sub controller update status failed", kvs...)
-			handleSyncClusterError(src, rc, err)
-			if updateError := r.UpdateStarRocksClusterStatus(ctx, src); updateError != nil {
+			handleSyncClusterError(esrc, rc, err)
+			if updateError := r.UpdateStarRocksClusterStatus(ctx, esrc); updateError != nil {
 				logger.Error(updateError, "failed to update StarRocksCluster Status")
 			}
 			return requeueIfError(err)
@@ -115,8 +109,8 @@ func (r *StarRocksClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	logger.Info("update StarRocksCluster level status")
-	r.reconcileStatus(ctx, src)
-	err = r.UpdateStarRocksClusterStatus(ctx, src)
+	r.reconcileStatus(ctx, esrc)
+	err = r.UpdateStarRocksClusterStatus(ctx, esrc)
 	if err != nil {
 		logger.Error(err, "update StarRocksCluster status failed")
 		return ctrl.Result{}, err
@@ -128,14 +122,13 @@ func (r *StarRocksClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 // UpdateStarRocksClusterStatus update the status of src.
 func (r *StarRocksClusterReconciler) UpdateStarRocksClusterStatus(ctx context.Context, src *srapi.StarRocksCluster) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		var esrc srapi.StarRocksCluster
-		client := r.Client
-		if err := client.Get(ctx, types.NamespacedName{Namespace: src.Namespace, Name: src.Name}, &esrc); err != nil {
+		esrc := new(srapi.StarRocksCluster)
+		if err := r.Get(ctx, types.NamespacedName{Namespace: src.Namespace, Name: src.Name}, esrc); err != nil {
 			return err
 		}
 
 		esrc.Status = src.Status
-		return r.Client.Status().Update(ctx, &esrc)
+		return r.Status().Update(ctx, esrc)
 	})
 }
 

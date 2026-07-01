@@ -28,6 +28,7 @@ func (controller *FeProxyController) SyncConfigMap(ctx context.Context, src *sra
 
 	feSearchServiceName := service.SearchServiceName(src.Name, feSpec)
 	feExternalServiceName := service.ExternalServiceName(src.Name, feSpec)
+	// TODO: AD settings for secure connection
 	proxyPass := fmt.Sprintf("http://%s.%s.%s:%d", feExternalServiceName, src.GetNamespace(), cmdconfig.GetServiceDomainSuffix(), httpPort)
 
 	resolver := feProxySpec.Resolver

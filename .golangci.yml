@@ -84,6 +84,10 @@ linters:
       - legacy
       - std-error-handling
     rules:
+      # kubebuilder RBAC markers are single-line codegen directives that cannot be wrapped.
+      - linters:
+          - lll
+        source: '\+kubebuilder:rbac:'
       - linters:
           - mnd
           - dupl
