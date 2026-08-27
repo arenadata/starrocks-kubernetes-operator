@@ -28,96 +28,6 @@ import (
 	"github.com/StarRocks/starrocks-kubernetes-operator/pkg/k8sutils/templates/service"
 )
 
-func TestMakeLifeCycle(t *testing.T) {
-	type args struct {
-		lifeCycle      *corev1.Lifecycle
-		preStopCommand []string
-	}
-	tests := []struct {
-		name string
-		args args
-		want *corev1.Lifecycle
-	}{
-		{
-			name: "test without lifecycle",
-			args: args{
-				lifeCycle:      nil,
-				preStopCommand: []string{"/scripts/pre-stop.sh"},
-			},
-			want: &corev1.Lifecycle{
-				PreStop: &corev1.LifecycleHandler{
-					Exec: &corev1.ExecAction{
-						Command: []string{"/scripts/pre-stop.sh"},
-					},
-				},
-			},
-		},
-		{
-			name: "test with lifecycle",
-			args: args{
-				lifeCycle: &corev1.Lifecycle{
-					PreStop: &corev1.LifecycleHandler{
-						Exec: &corev1.ExecAction{
-							Command: []string{"/scripts/my-pre-stop.sh"},
-						},
-					},
-					PostStart: &corev1.LifecycleHandler{
-						Exec: &corev1.ExecAction{
-							Command: []string{"/scripts/my-post-start.sh"},
-						},
-					},
-				},
-				preStopCommand: []string{"/scripts/pre-stop.sh"},
-			},
-			want: &corev1.Lifecycle{
-				PreStop: &corev1.LifecycleHandler{
-					Exec: &corev1.ExecAction{
-						Command: []string{"/scripts/my-pre-stop.sh"},
-					},
-				},
-				PostStart: &corev1.LifecycleHandler{
-					Exec: &corev1.ExecAction{
-						Command: []string{"/scripts/my-post-start.sh"},
-					},
-				},
-			},
-		},
-		{
-			name: "test with lifecycle without prestop",
-			args: args{
-				lifeCycle: &corev1.Lifecycle{
-					PostStart: &corev1.LifecycleHandler{
-						Exec: &corev1.ExecAction{
-							Command: []string{"/scripts/my-post-start.sh"},
-						},
-					},
-				},
-				preStopCommand: []string{"/scripts/pre-stop.sh"},
-			},
-			want: &corev1.Lifecycle{
-				PreStop: &corev1.LifecycleHandler{
-					Exec: &corev1.ExecAction{
-						Command: []string{"/scripts/pre-stop.sh"},
-					},
-				},
-				PostStart: &corev1.LifecycleHandler{
-					Exec: &corev1.ExecAction{
-						Command: []string{"/scripts/my-post-start.sh"},
-					},
-				},
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			actual := LifeCycle(tt.args.lifeCycle, tt.args.preStopCommand)
-			if !reflect.DeepEqual(actual, tt.want) {
-				t.Errorf("LifeCycle() = %v, want %v", actual, tt.want)
-			}
-		})
-	}
-}
-
 func TestLabels(t *testing.T) {
 	type args struct {
 		clusterName string
@@ -630,31 +540,62 @@ func TestGetStarRocksRootPath(t *testing.T) {
 	}
 }
 
-func TestGetPreStopCommand(t *testing.T) {
-	type args struct {
-		spec v1.SpecInterface
-	}
+func TestContainerCommandAndArgs(t *testing.T) {
 	tests := []struct {
-		name string
-		args args
-		want []string
+		name        string
+		spec        v1.SpecInterface
+		wantCommand []string
+		wantArgs    []string
 	}{
 		{
-			name: "get pre stop command",
-			args: args{
-				spec: &v1.StarRocksCnSpec{},
+			name:        "default: keep the image entrypoint, pass the script through args",
+			spec:        &v1.StarRocksFeSpec{},
+			wantCommand: nil,
+			wantArgs:    []string{"/opt/starrocks/fe_entrypoint.sh", "$(FE_SERVICE_NAME)"},
+		},
+		{
+			name: "custom root path",
+			spec: &v1.StarRocksBeSpec{
+				BeEnvVars: []corev1.EnvVar{{Name: "STARROCKS_ROOT", Value: "/data/starrocks"}},
 			},
-			want: []string{
-				"/bin/bash",
-				"-c",
-				"/opt/starrocks/cn/bin/stop_cn.sh -g",
+			wantCommand: nil,
+			wantArgs:    []string{"/data/starrocks/be_entrypoint.sh", "$(FE_SERVICE_NAME)"},
+		},
+		{
+			name: "user args are passed to the default entrypoint script",
+			spec: &v1.StarRocksCnSpec{
+				StarRocksComponentSpec: v1.StarRocksComponentSpec{Args: []string{"my-fe-svc"}},
 			},
+			wantCommand: nil,
+			wantArgs:    []string{"/opt/starrocks/cn_entrypoint.sh", "my-fe-svc"},
+		},
+		{
+			name: "user command replaces the entrypoint, default args are kept",
+			spec: &v1.StarRocksFeSpec{
+				StarRocksComponentSpec: v1.StarRocksComponentSpec{Command: []string{"/my/entrypoint.sh"}},
+			},
+			wantCommand: []string{"/my/entrypoint.sh"},
+			wantArgs:    []string{"$(FE_SERVICE_NAME)"},
+		},
+		{
+			name: "user command and args are passed as they are",
+			spec: &v1.StarRocksFeSpec{
+				StarRocksComponentSpec: v1.StarRocksComponentSpec{
+					Command: []string{"bash", "-c"},
+					Args:    []string{"/my/entrypoint.sh $(FE_SERVICE_NAME)"},
+				},
+			},
+			wantCommand: []string{"bash", "-c"},
+			wantArgs:    []string{"/my/entrypoint.sh $(FE_SERVICE_NAME)"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := GetPreStopCommand(tt.args.spec); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetPreStopCommand() = %v, want %v", got, tt.want)
+			if got := ContainerCommand(tt.spec); !reflect.DeepEqual(got, tt.wantCommand) {
+				t.Errorf("ContainerCommand() = %v, want %v", got, tt.wantCommand)
+			}
+			if got := ContainerArgs(tt.spec); !reflect.DeepEqual(got, tt.wantArgs) {
+				t.Errorf("ContainerArgs() = %v, want %v", got, tt.wantArgs)
 			}
 		})
 	}

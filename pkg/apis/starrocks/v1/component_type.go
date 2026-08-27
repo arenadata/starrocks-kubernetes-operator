@@ -77,15 +77,16 @@ type StarRocksComponentSpec struct {
 	InitContainers []corev1.Container `json:"initContainers,omitempty"`
 
 	// Entrypoint array. Not executed within a shell.
-	// If this is not provided, it will use default entrypoint for different components:
-	//	1. For FE, it will use /opt/starrocks/fe_entrypoint.sh as the entrypoint.
-	//  2. For BE, it will use /opt/starrocks/be_entrypoint.sh as the entrypoint.
-	//  3. For CN, it will use /opt/starrocks/cn_entrypoint.sh as the entrypoint.
+	// If this is not provided, the ENTRYPOINT of the image (tini) is kept and the default entrypoint script of
+	// the component is passed to it as the first argument:
+	//	1. For FE, /opt/starrocks/fe_entrypoint.sh.
+	//  2. For BE, /opt/starrocks/be_entrypoint.sh.
+	//  3. For CN, /opt/starrocks/cn_entrypoint.sh.
 	// More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
 	// +optional
 	Command []string `json:"command,omitempty"`
 
-	// Arguments to the entrypoint.
+	// Arguments to the entrypoint script (or to the command, if it is provided).
 	// If this is not provided, it will use $(FE_SERVICE_NAME) for all components.
 	// Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
 	// cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
