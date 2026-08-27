@@ -37,6 +37,9 @@ import (
 	"github.com/StarRocks/starrocks-kubernetes-operator/pkg/subcontrollers/feproxy"
 )
 
+// subControllerLogKey is the key of the sub controller name in structured log messages.
+const subControllerLogKey = "subController"
+
 // StarRocksClusterReconciler reconciles a StarRocksCluster object
 type StarRocksClusterReconciler struct {
 	client.Client
@@ -83,8 +86,7 @@ func (r *StarRocksClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	// subControllers reconcile for create or update component.
 	for _, rc := range r.Scs {
-		//nolint:goconst
-		kvs := []interface{}{"subController", rc.GetControllerName()}
+		kvs := []interface{}{subControllerLogKey, rc.GetControllerName()}
 		logger.Info("sub controller sync spec", kvs...)
 		if err = rc.SyncCluster(ctx, esrc); err != nil {
 			logger.Error(err, "sub controller reconciles spec failed", kvs...)
@@ -97,7 +99,7 @@ func (r *StarRocksClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	for _, rc := range r.Scs {
-		kvs := []interface{}{"subController", rc.GetControllerName()}
+		kvs := []interface{}{subControllerLogKey, rc.GetControllerName()}
 		logger.Info("sub controller update status", kvs...)
 		if err = rc.UpdateClusterStatus(ctx, esrc); err != nil {
 			logger.Error(err, "sub controller update status failed", kvs...)

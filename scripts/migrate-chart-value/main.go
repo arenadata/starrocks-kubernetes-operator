@@ -20,13 +20,15 @@ const (
 	NEW_VERSION = "v1.8.0"
 	OPERATOR    = "operator"
 	STARROCKS   = "starrocks"
+
+	NAME_OVERRIDE = "nameOverride"
+	TIME_ZONE     = "timeZone"
 )
 
-//nolint:goconst
-var _starrocksKeys = []string{"nameOverride", "initPassword", "timeZone", "datadog", "starrocksCluster",
+var _starrocksKeys = []string{NAME_OVERRIDE, "initPassword", TIME_ZONE, "datadog", "starrocksCluster",
 	"starrocksFESpec", "starrocksCnSpec", "starrocksBeSpec", "secrets", "configMaps", "feProxy"}
 
-var _operatorKeys = []string{"global", "timeZone", "nameOverride", "starrocksOperator"}
+var _operatorKeys = []string{"global", TIME_ZONE, NAME_OVERRIDE, "starrocksOperator"}
 
 func main() {
 	flag.Usage = func() {
@@ -126,8 +128,8 @@ func Do(reader io.Reader, targetChartVersion string, writer io.Writer) error {
 		// change the new version to old version
 		mapper := operator.(map[interface{}]interface{})
 		// remove duplicate fields from operator
-		delete(mapper, "timeZone")
-		delete(mapper, "nameOverride")
+		delete(mapper, TIME_ZONE)
+		delete(mapper, NAME_OVERRIDE)
 		data1, err := yaml.Marshal(operator)
 		if err != nil {
 			return err
@@ -164,9 +166,9 @@ func Do(reader io.Reader, targetChartVersion string, writer io.Writer) error {
 func Write(w io.Writer, originalFields map[string]interface{}, keys []string, header string) error {
 	getValue := func(key string) interface{} {
 		switch key {
-		case "timeZone":
+		case TIME_ZONE:
 			return "Asia/Shanghai"
-		case "nameOverride":
+		case NAME_OVERRIDE:
 			return "kube-starrocks"
 		}
 		return nil
