@@ -22,6 +22,7 @@ const (
 	STARROCKS   = "starrocks"
 )
 
+//nolint:goconst
 var _starrocksKeys = []string{"nameOverride", "initPassword", "timeZone", "datadog", "starrocksCluster",
 	"starrocksFESpec", "starrocksCnSpec", "starrocksBeSpec", "secrets", "configMaps", "feProxy"}
 

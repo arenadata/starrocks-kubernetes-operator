@@ -83,6 +83,7 @@ func (r *StarRocksClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	// subControllers reconcile for create or update component.
 	for _, rc := range r.Scs {
+		//nolint:goconst
 		kvs := []interface{}{"subController", rc.GetControllerName()}
 		logger.Info("sub controller sync spec", kvs...)
 		if err = rc.SyncCluster(ctx, esrc); err != nil {

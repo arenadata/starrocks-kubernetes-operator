@@ -66,7 +66,9 @@ func (r *StarRocksWarehouseReconciler) Reconcile(ctx context.Context, req ctrl.R
 		if apierrors.IsNotFound(err) {
 			logger.Info("StarRocksWarehouse CR is not found, maybe deleted, begin to clear warehouse")
 			for _, controller := range r.subControllers {
+				//nolint:goconst
 				kvs := []interface{}{"subController", controller.GetControllerName()}
+
 				logger.Info("sub controller begin to clear warehouse", kvs...)
 				if err = controller.ClearWarehouse(ctx, req.Namespace, req.Name); err != nil {
 					logger.Error(err, "failed to clear warehouse", kvs...)
