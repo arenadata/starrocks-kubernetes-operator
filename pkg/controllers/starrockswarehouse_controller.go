@@ -66,7 +66,8 @@ func (r *StarRocksWarehouseReconciler) Reconcile(ctx context.Context, req ctrl.R
 		if apierrors.IsNotFound(err) {
 			logger.Info("StarRocksWarehouse CR is not found, maybe deleted, begin to clear warehouse")
 			for _, controller := range r.subControllers {
-				kvs := []interface{}{"subController", controller.GetControllerName()}
+				kvs := []interface{}{subControllerLogKey, controller.GetControllerName()}
+
 				logger.Info("sub controller begin to clear warehouse", kvs...)
 				if err = controller.ClearWarehouse(ctx, req.Namespace, req.Name); err != nil {
 					logger.Error(err, "failed to clear warehouse", kvs...)
@@ -87,7 +88,7 @@ func (r *StarRocksWarehouseReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	for _, controller := range r.subControllers {
-		kvs := []interface{}{"subController", controller.GetControllerName()}
+		kvs := []interface{}{subControllerLogKey, controller.GetControllerName()}
 		logger.Info("sub controller sync spec", kvs...)
 		if err = controller.SyncWarehouse(ctx, warehouse); err != nil {
 			handled := handleSyncWarehouseError(ctx, err, warehouse)
@@ -102,7 +103,7 @@ func (r *StarRocksWarehouseReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	for _, controller := range r.subControllers {
-		kvs := []interface{}{"subController", controller.GetControllerName()}
+		kvs := []interface{}{subControllerLogKey, controller.GetControllerName()}
 		logger.Info("sub controller update warehouse status", kvs...)
 		if err = controller.UpdateWarehouseStatus(ctx, warehouse); err != nil {
 			logger.Error(err, "update warehouse status failed", kvs...)

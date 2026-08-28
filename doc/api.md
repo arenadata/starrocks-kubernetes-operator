@@ -1372,10 +1372,11 @@ See <a href="https://kubernetes.io/docs/reference/kubernetes-api/workload-resour
 <td>
 <em>(Optional)</em>
 <p>Entrypoint array. Not executed within a shell.
-If this is not provided, it will use default entrypoint for different components:
-1. For FE, it will use /opt/starrocks/fe_entrypoint.sh as the entrypoint.
-2. For BE, it will use /opt/starrocks/be_entrypoint.sh as the entrypoint.
-3. For CN, it will use /opt/starrocks/cn_entrypoint.sh as the entrypoint.
+If this is not provided, the ENTRYPOINT of the image (tini) is kept and the default entrypoint script of
+the component is passed to it as the first argument:
+1. For FE, /opt/starrocks/fe_entrypoint.sh.
+2. For BE, /opt/starrocks/be_entrypoint.sh.
+3. For CN, /opt/starrocks/cn_entrypoint.sh.
 More info: <a href="https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell">https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell</a></p>
 </td>
 </tr>
@@ -1388,7 +1389,7 @@ More info: <a href="https://kubernetes.io/docs/tasks/inject-data-application/def
 </td>
 <td>
 <em>(Optional)</em>
-<p>Arguments to the entrypoint.
+<p>Arguments to the entrypoint script (or to the command, if it is provided).
 If this is not provided, it will use $(FE_SERVICE_NAME) for all components.
 Variable references $(VAR_NAME) are expanded using the container&rsquo;s environment. If a variable
 cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
@@ -2065,9 +2066,9 @@ Kubernetes core/v1.Lifecycle
 <td>
 <em>(Optional)</em>
 <p>Lifecycle describes actions that the management system should take in response to container lifecycle events.
-By default, Operator will add corresponding preStop hooks for different components. For example, the preStop
-script for the FE Component is /opt/starrocks/fe_prestop.sh, for the BE Component is /opt/starrocks/be_prestop.sh,
-and for the CN Component is /opt/starrocks/cn_prestop.sh.</p>
+The operator does not add any hook by default. FE/BE/CN stop gracefully on the container stop signal
+(SIGUSR1 for FE, declared as STOPSIGNAL in the image; SIGTERM for BE and CN), bounded by
+terminationGracePeriodSeconds, so no preStop hook is needed.</p>
 </td>
 </tr>
 <tr>
@@ -2643,5 +2644,5 @@ AutoScalingPolicy
 <hr/>
 <p><em>
 Generated with <code>gen-crd-api-reference-docs</code>
-on git commit <code>850a864</code>.
+on git commit <code>5385134</code>.
 </em></p>

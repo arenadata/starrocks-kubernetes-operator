@@ -191,9 +191,9 @@ type StarRocksLoadSpec struct {
 	ReadinessProbeFailureSeconds *int32 `json:"readinessProbeFailureSeconds,omitempty"`
 
 	// Lifecycle describes actions that the management system should take in response to container lifecycle events.
-	// By default, Operator will add corresponding preStop hooks for different components. For example, the preStop
-	// script for the FE Component is /opt/starrocks/fe_prestop.sh, for the BE Component is /opt/starrocks/be_prestop.sh,
-	// and for the CN Component is /opt/starrocks/cn_prestop.sh.
+	// The operator does not add any hook by default. FE/BE/CN stop gracefully on the container stop signal
+	// (SIGUSR1 for FE, declared as STOPSIGNAL in the image; SIGTERM for BE and CN), bounded by
+	// terminationGracePeriodSeconds, so no preStop hook is needed.
 	// +optional
 	Lifecycle *corev1.Lifecycle `json:"lifecycle,omitempty"`
 

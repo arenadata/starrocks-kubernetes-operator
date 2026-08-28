@@ -32,30 +32,6 @@ const (
 	HEALTH_API_PATH = "/api/health"
 )
 
-// LifeCycle returns a lifecycle.
-func LifeCycle(lifeCycle *corev1.Lifecycle, preStopCommand []string) *corev1.Lifecycle {
-	defaultPreStop := &corev1.LifecycleHandler{
-		Exec: &corev1.ExecAction{
-			Command: preStopCommand,
-		},
-	}
-
-	if lifeCycle == nil {
-		return &corev1.Lifecycle{
-			PreStop: defaultPreStop,
-		}
-	}
-
-	preStop := lifeCycle.PreStop
-	if preStop == nil {
-		preStop = defaultPreStop
-	}
-	return &corev1.Lifecycle{
-		PreStop:   preStop,
-		PostStart: lifeCycle.PostStart,
-	}
-}
-
 func Labels(clusterName string, spec v1.SpecInterface) map[string]string {
 	addLabels := func(labels map[string]string, additionalLabels map[string]string) {
 		for k, v := range additionalLabels {
@@ -379,33 +355,6 @@ func GetConfigDir(spec v1.SpecInterface) string {
 	return ""
 }
 
-func GetPreStopCommand(spec v1.SpecInterface) []string {
-	command := []string{"/bin/bash", "-c"}
-	// we do not need to set --timeout parameter for stop_xx.sh, because the terminationGracePeriodSeconds configuration
-	// on Pod will take the same effect
-	switch v := spec.(type) {
-	case *v1.StarRocksFeSpec:
-		command = append(command, fmt.Sprintf("%s/fe/bin/stop_fe.sh -g", GetStarRocksRootPath(v.FeEnvVars)))
-	case *v1.StarRocksBeSpec:
-		imageVersion := GetImageVersion(spec.GetImage())
-		b, err := IsLowerThanAny(imageVersion, []string{"3.3.19", "3.4.8", "3.5.6"})
-		if err == nil && b {
-			command = append(command, fmt.Sprintf("%s/be/bin/stop_be.sh", GetStarRocksRootPath(v.BeEnvVars)))
-		} else {
-			command = append(command, fmt.Sprintf("%s/be/bin/stop_be.sh -g", GetStarRocksRootPath(v.BeEnvVars)))
-		}
-	case *v1.StarRocksCnSpec:
-		imageVersion := GetImageVersion(spec.GetImage())
-		b, err := IsLowerThanAny(imageVersion, []string{"3.3.17", "3.4.6", "3.5.2"})
-		if err == nil && b {
-			command = append(command, fmt.Sprintf("%s/cn/bin/stop_cn.sh", GetStarRocksRootPath(v.CnEnvVars)))
-		} else {
-			command = append(command, fmt.Sprintf("%s/cn/bin/stop_cn.sh -g", GetStarRocksRootPath(v.CnEnvVars)))
-		}
-	}
-	return command
-}
-
 func GetStarRocksDefaultRootPath() string {
 	return "/opt/starrocks"
 }
@@ -419,19 +368,22 @@ func GetStarRocksRootPath(envVars []corev1.EnvVar) string {
 	return "/opt/starrocks"
 }
 
+// ContainerCommand returns the command of the main container: the user-provided one, or nil so that the
+// ENTRYPOINT of the image (tini) is kept as PID 1 and the default entrypoint script is passed through args.
 func ContainerCommand(spec v1.SpecInterface) []string {
-	if spec.GetCommand() != nil {
-		return spec.GetCommand()
-	}
-
-	script := getDefaultEntrypointScript(spec)
-	return []string{script}
+	return spec.GetCommand()
 }
 
+// ContainerArgs returns the args of the main container. The arguments of the entrypoint are the user-provided
+// ones or $(FE_SERVICE_NAME) by default. When no command is set, they are prefixed with the default entrypoint
+// script of the component, which is then run by the ENTRYPOINT of the image.
 func ContainerArgs(spec v1.SpecInterface) []string {
-	if spec.GetArgs() != nil {
-		return spec.GetArgs()
+	args := spec.GetArgs()
+	if args == nil {
+		args = []string{"$(FE_SERVICE_NAME)"}
 	}
-
-	return []string{"$(FE_SERVICE_NAME)"}
+	if spec.GetCommand() != nil {
+		return args
+	}
+	return append([]string{getDefaultEntrypointScript(spec)}, args...)
 }
