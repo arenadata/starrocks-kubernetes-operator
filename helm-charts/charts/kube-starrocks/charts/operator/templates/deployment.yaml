@@ -38,12 +38,8 @@ spec:
         - --leader-elect
         {{- toYaml .Values.starrocksOperator.log | nindent 8 }}
         {{- if .Values.starrocksOperator.watchNamespace }}
-        - --namespace={{ .Values.starrocksOperator.watchNamespace }}
+        - --ns={{ .Values.starrocksOperator.watchNamespace }}
         {{- end }}
-        {{- if .Values.starrocksOperator.dnsDomainSuffix }}
-        - --dns-domain-suffix={{ .Values.starrocksOperator.dnsDomainSuffix }}
-        {{- end }}
-        - --volume-name-with-hash={{ .Values.starrocksOperator.volumeNameWithHash }}
         env:
         - name: TZ
           value: {{ .Values.timeZone }}
