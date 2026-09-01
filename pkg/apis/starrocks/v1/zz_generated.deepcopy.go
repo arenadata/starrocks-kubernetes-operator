@@ -411,6 +411,16 @@ func (in *StarRocksCnStatus) DeepCopy() *StarRocksCnStatus {
 func (in *StarRocksComponentSpec) DeepCopyInto(out *StarRocksComponentSpec) {
 	*out = *in
 	in.StarRocksLoadSpec.DeepCopyInto(&out.StarRocksLoadSpec)
+	if in.SecurityContext != nil {
+		in, out := &in.SecurityContext, &out.SecurityContext
+		*out = new(corev1.SecurityContext)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.PodSecurityContext != nil {
+		in, out := &in.PodSecurityContext, &out.PodSecurityContext
+		*out = new(corev1.PodSecurityContext)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.RunAsNonRoot != nil {
 		in, out := &in.RunAsNonRoot, &out.RunAsNonRoot
 		*out = new(bool)

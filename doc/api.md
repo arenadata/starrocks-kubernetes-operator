@@ -1242,6 +1242,40 @@ StarRocksLoadSpec
 </tr>
 <tr>
 <td>
+<code>securityContext</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.24/#securitycontext-v1-core">
+Kubernetes core/v1.SecurityContext
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SecurityContext holds the security settings of the StarRocks container. Every field set here wins
+over what the operator derives from the deprecated shortcuts below, everything else keeps its
+default, so that a deployment can express what its policy requires - a seccomp profile, dropping
+all capabilities, a specific user - without the operator having to know about the field.
+See <a href="https://kubernetes.io/docs/tasks/configure-pod-container/security-context/">https://kubernetes.io/docs/tasks/configure-pod-container/security-context/</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podSecurityContext</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.24/#podsecuritycontext-v1-core">
+Kubernetes core/v1.PodSecurityContext
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodSecurityContext holds the security settings of the pod, applied the same way as SecurityContext.
+Note that the operator sets FSGroup by default: the configuration and the other Secrets are mounted
+with mode 0440 and belong to that group, without it the StarRocks process can not read them.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>runAsNonRoot</code><br/>
 <em>
 bool
@@ -1250,7 +1284,8 @@ bool
 <td>
 <p>RunAsNonRoot is used to determine whether to run starrocks as a normal user.
 If RunAsNonRoot is true, operator will set RunAsUser and RunAsGroup to 1000 in securityContext.
-default: nil</p>
+default: nil
+Deprecated: set runAsUser/runAsGroup/runAsNonRoot in SecurityContext instead.</p>
 </td>
 </tr>
 <tr>
@@ -1265,7 +1300,8 @@ Kubernetes core/v1.Capabilities
 <td>
 <em>(Optional)</em>
 <p>refer to <a href="https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-capabilities-for-a-container">https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-capabilities-for-a-container</a>
-grant certain privileges to a process without granting all the privileges of the root user</p>
+grant certain privileges to a process without granting all the privileges of the root user
+Deprecated: set capabilities in SecurityContext instead.</p>
 </td>
 </tr>
 <tr>
@@ -1435,7 +1471,9 @@ the installation. StarRocks images do so since 4.4.0/4.0.10.1; with an older ima
 components fail to start or silently ignore the mounted configuration.
 3. When it is enabled the operator mounts an emptyDir at /tmp and points PID_DIR (and
 UDF_RUNTIME_DIR for BE/CN) at it. Anything else the deployment writes to - the spill
-directory, small files, FE tmp_dir - has to be pointed at a volume in the configuration.</p>
+directory, small files, FE tmp_dir - has to be pointed at a volume in the configuration.
+Deprecated: set readOnlyRootFilesystem in SecurityContext instead, the operator honors it there
+as well.</p>
 </td>
 </tr>
 <tr>
@@ -1449,7 +1487,8 @@ directory, small files, FE tmp_dir - has to be pointed at a volume in the config
 </td>
 <td>
 <p>Sysctls defines a list of namespaced sysctls for the podSecurityContext.sysctls
-See <a href="https://kubernetes.io/docs/tasks/administer-cluster/sysctl-cluster/">https://kubernetes.io/docs/tasks/administer-cluster/sysctl-cluster/</a> for more details.</p>
+See <a href="https://kubernetes.io/docs/tasks/administer-cluster/sysctl-cluster/">https://kubernetes.io/docs/tasks/administer-cluster/sysctl-cluster/</a> for more details.
+Deprecated: set sysctls in PodSecurityContext instead.</p>
 </td>
 </tr>
 <tr>
@@ -2647,5 +2686,5 @@ AutoScalingPolicy
 <hr/>
 <p><em>
 Generated with <code>gen-crd-api-reference-docs</code>
-on git commit <code>0c63e50</code>.
+on git commit <code>a71efb1</code>.
 </em></p>

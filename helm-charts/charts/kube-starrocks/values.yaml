@@ -359,6 +359,18 @@ starrocks:
     sysctls: []
       # - name: net.ipv4.ip_unprivileged_port_start
       #   value: "2048"
+    # securityContext holds the security settings of the StarRocks container, and podSecurityContext the
+    # ones of the pod. They are the full Kubernetes types: whatever is set here wins over runAsNonRoot,
+    # capabilities, readOnlyRootFilesystem and sysctls above, which are kept for compatibility.
+    securityContext: {}
+      # readOnlyRootFilesystem: true
+      # seccompProfile:
+      #   type: RuntimeDefault
+      # capabilities:
+      #   drop:
+      #     - ALL
+    podSecurityContext: {}
+      # fsGroup: 1000
     # specify the service name and port config and serviceType
     # the service type refers https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
     service:
@@ -690,6 +702,18 @@ starrocks:
     sysctls: []
       # - name: net.ipv4.ip_unprivileged_port_start
       #   value: "2048"
+    # securityContext holds the security settings of the StarRocks container, and podSecurityContext the
+    # ones of the pod. They are the full Kubernetes types: whatever is set here wins over runAsNonRoot,
+    # capabilities, readOnlyRootFilesystem and sysctls above, which are kept for compatibility.
+    securityContext: {}
+      # readOnlyRootFilesystem: true
+      # seccompProfile:
+      #   type: RuntimeDefault
+      # capabilities:
+      #   drop:
+      #     - ALL
+    podSecurityContext: {}
+      # fsGroup: 1000
     # specify the service name and port config and serviceType
     # the service type refers https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
     service:
@@ -1057,6 +1081,18 @@ starrocks:
     sysctls: []
       # - name: net.ipv4.ip_unprivileged_port_start
       #   value: "2048"
+    # securityContext holds the security settings of the StarRocks container, and podSecurityContext the
+    # ones of the pod. They are the full Kubernetes types: whatever is set here wins over runAsNonRoot,
+    # capabilities, readOnlyRootFilesystem and sysctls above, which are kept for compatibility.
+    securityContext: {}
+      # readOnlyRootFilesystem: true
+      # seccompProfile:
+      #   type: RuntimeDefault
+      # capabilities:
+      #   drop:
+      #     - ALL
+    podSecurityContext: {}
+      # fsGroup: 1000
     # specify the service name and port config and serviceType
     # the service type refers https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
     service:

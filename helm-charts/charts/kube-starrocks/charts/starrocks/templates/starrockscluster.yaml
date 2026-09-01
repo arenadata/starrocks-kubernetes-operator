@@ -107,6 +107,14 @@ spec:
     sysctls:
       {{- toYaml .Values.starrocksFESpec.sysctls | nindent 6 }}
     {{- end }}
+    {{- if .Values.starrocksFESpec.securityContext }}
+    securityContext:
+      {{- toYaml .Values.starrocksFESpec.securityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.starrocksFESpec.podSecurityContext }}
+    podSecurityContext:
+      {{- toYaml .Values.starrocksFESpec.podSecurityContext | nindent 6 }}
+    {{- end }}
     {{- if or .Values.starrocksFESpec.nodeSelector .Values.starrocksCluster.componentValues.nodeSelector }}
     nodeSelector:
       {{- include "starrockscluster.fe.nodeSelector" . | nindent 6 }}
@@ -389,6 +397,14 @@ spec:
     sysctls:
       {{- toYaml .Values.starrocksBeSpec.sysctls | nindent 6 }}
     {{- end }}
+    {{- if .Values.starrocksBeSpec.securityContext }}
+    securityContext:
+      {{- toYaml .Values.starrocksBeSpec.securityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.starrocksBeSpec.podSecurityContext }}
+    podSecurityContext:
+      {{- toYaml .Values.starrocksBeSpec.podSecurityContext | nindent 6 }}
+    {{- end }}
     {{- if or .Values.starrocksBeSpec.podLabels .Values.starrocksCluster.componentValues.podLabels .Values.datadog.profiling.be }}
     podLabels:
       {{- if or .Values.starrocksBeSpec.podLabels .Values.starrocksCluster.componentValues.podLabels }}
@@ -635,6 +651,14 @@ spec:
     {{- if .Values.starrocksCnSpec.sysctls }}
     sysctls:
       {{- toYaml .Values.starrocksCnSpec.sysctls | nindent 6 }}
+    {{- end }}
+    {{- if .Values.starrocksCnSpec.securityContext }}
+    securityContext:
+      {{- toYaml .Values.starrocksCnSpec.securityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.starrocksCnSpec.podSecurityContext }}
+    podSecurityContext:
+      {{- toYaml .Values.starrocksCnSpec.podSecurityContext | nindent 6 }}
     {{- end }}
     {{- if or .Values.starrocksCnSpec.podLabels .Values.starrocksCluster.componentValues.podLabels .Values.datadog.profiling.cn }}
     podLabels:

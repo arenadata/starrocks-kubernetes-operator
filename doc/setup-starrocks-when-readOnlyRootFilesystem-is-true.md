@@ -20,6 +20,11 @@ The operator and the images take care of the first three:
 
 Everything else has to be pointed at a volume in the configuration, see the examples below.
 
+`readOnlyRootFilesystem` is part of the `securityContext` of the component, which is the full Kubernetes
+type, so the same place carries the user to run as, the seccomp profile and the capabilities. The older
+`readOnlyRootFilesystem`, `runAsNonRoot`, `capabilities` and `sysctls` fields of the spec still work and
+are used as the defaults for whatever the `securityContext` does not set.
+
 > Note: this needs an image whose entrypoint scripts do not write into the installation directory,
 > StarRocks `4.4.0` / `4.0.10.1` or later. With an older image the components either fail to start or
 > ignore the mounted configuration. Overriding `command` / `args` (or the `entrypoint` value of the chart)
@@ -38,8 +43,12 @@ spec:
   starRocksFeSpec:
     image: starrocks/fe-ubuntu:latest
     replicas: 1
-    readOnlyRootFilesystem: true
-    runAsNonRoot: true
+    securityContext:
+      readOnlyRootFilesystem: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      seccompProfile:
+        type: RuntimeDefault
     secrets:
     # the configuration is mounted over the conf directory of the installation
     - name: kube-starrocks-fe-conf
@@ -59,8 +68,12 @@ spec:
   starRocksBeSpec:
     image: starrocks/be-ubuntu:latest
     replicas: 1
-    readOnlyRootFilesystem: true
-    runAsNonRoot: true
+    securityContext:
+      readOnlyRootFilesystem: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      seccompProfile:
+        type: RuntimeDefault
     secrets:
     - name: kube-starrocks-be-conf
       mountPath: /opt/starrocks/be/conf
@@ -131,8 +144,10 @@ the volumes and the redirected paths are left to declare:
 ```yaml
 starrocks:
   starrocksFESpec:
-    readOnlyRootFilesystem: true
-    runAsNonRoot: true
+    securityContext:
+      readOnlyRootFilesystem: true
+      runAsUser: 1000
+      runAsGroup: 1000
     storageSpec:
       name: fe
       storageSize: 10Gi
@@ -153,8 +168,10 @@ starrocks:
       plugin_dir = /opt/starrocks/fe/tmp/plugins
       small_file_dir = /opt/starrocks/fe/tmp/small_files
   starrocksBeSpec:
-    readOnlyRootFilesystem: true
-    runAsNonRoot: true
+    securityContext:
+      readOnlyRootFilesystem: true
+      runAsUser: 1000
+      runAsGroup: 1000
     storageSpec:
       name: be
       storageSize: 100Gi

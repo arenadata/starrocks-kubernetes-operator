@@ -31,13 +31,29 @@ var _ SpecInterface = &StarRocksComponentSpec{}
 type StarRocksComponentSpec struct {
 	StarRocksLoadSpec `json:",inline"`
 
+	// SecurityContext holds the security settings of the StarRocks container. Every field set here wins
+	// over what the operator derives from the deprecated shortcuts below, everything else keeps its
+	// default, so that a deployment can express what its policy requires - a seccomp profile, dropping
+	// all capabilities, a specific user - without the operator having to know about the field.
+	// See https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+	// +optional
+	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
+
+	// PodSecurityContext holds the security settings of the pod, applied the same way as SecurityContext.
+	// Note that the operator sets FSGroup by default: the configuration and the other Secrets are mounted
+	// with mode 0440 and belong to that group, without it the StarRocks process can not read them.
+	// +optional
+	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
+
 	// RunAsNonRoot is used to determine whether to run starrocks as a normal user.
 	// If RunAsNonRoot is true, operator will set RunAsUser and RunAsGroup to 1000 in securityContext.
 	// default: nil
+	// Deprecated: set runAsUser/runAsGroup/runAsNonRoot in SecurityContext instead.
 	RunAsNonRoot *bool `json:"runAsNonRoot,omitempty"`
 
 	// refer to https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-capabilities-for-a-container
 	// grant certain privileges to a process without granting all the privileges of the root user
+	// Deprecated: set capabilities in SecurityContext instead.
 	// +optional
 	Capabilities *corev1.Capabilities `json:"capabilities,omitempty"`
 
@@ -116,11 +132,14 @@ type StarRocksComponentSpec struct {
 	//	3. When it is enabled the operator mounts an emptyDir at /tmp and points PID_DIR (and
 	//     UDF_RUNTIME_DIR for BE/CN) at it. Anything else the deployment writes to - the spill
 	//     directory, small files, FE tmp_dir - has to be pointed at a volume in the configuration.
+	// Deprecated: set readOnlyRootFilesystem in SecurityContext instead, the operator honors it there
+	// as well.
 	// +optional
 	ReadOnlyRootFilesystem *bool `json:"readOnlyRootFilesystem,omitempty" protobuf:"varint,6,opt,name=readOnlyRootFilesystem"`
 
 	// Sysctls defines a list of namespaced sysctls for the podSecurityContext.sysctls
 	// See https://kubernetes.io/docs/tasks/administer-cluster/sysctl-cluster/ for more details.
+	// Deprecated: set sysctls in PodSecurityContext instead.
 	Sysctls []corev1.Sysctl `json:"sysctls,omitempty"`
 
 	// PersistentVolumeClaimRetentionPolicy specifies the retention policy for PersistentVolumeClaims associated with the component.
@@ -294,6 +313,14 @@ func ValidUpdateStrategy(updateStrategy *appsv1.StatefulSetUpdateStrategy) error
 		}
 	}
 	return nil
+}
+
+func (spec *StarRocksComponentSpec) GetSecurityContext() *corev1.SecurityContext {
+	return spec.SecurityContext
+}
+
+func (spec *StarRocksComponentSpec) GetPodSecurityContext() *corev1.PodSecurityContext {
+	return spec.PodSecurityContext
 }
 
 func (spec *StarRocksComponentSpec) IsReadOnlyRootFilesystem() *bool {

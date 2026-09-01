@@ -115,7 +115,7 @@ const tmpVolumeName = "starrocks-tmp"
 // filesystem and the deployment does not mount something there itself.
 func MountWritableTmpDir(spec v1.SpecInterface, volumes []corev1.Volume,
 	volumeMounts []corev1.VolumeMount) ([]corev1.Volume, []corev1.VolumeMount) {
-	if readOnly := spec.IsReadOnlyRootFilesystem(); readOnly == nil || !*readOnly {
+	if !IsReadOnlyRootFilesystem(spec) {
 		return volumes, volumeMounts
 	}
 	for i := range volumeMounts {

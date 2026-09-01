@@ -63,7 +63,17 @@ type SpecInterface interface {
 
 	// IsReadOnlyRootFilesystem returns whether the container's root filesystem should be read-only.
 	// A read-only root filesystem prevents modifications to improve security.
+	// Deprecated: the securityContext of the spec can carry it as well, use
+	// pod.IsReadOnlyRootFilesystem to get the value that ends up in the container.
 	IsReadOnlyRootFilesystem() *bool
+
+	// GetSecurityContext returns the security settings the deployment asks for on the container, which
+	// are applied on top of the ones the operator derives from the spec.
+	GetSecurityContext() *corev1.SecurityContext
+
+	// GetPodSecurityContext returns the security settings the deployment asks for on the pod, applied
+	// the same way as GetSecurityContext.
+	GetPodSecurityContext() *corev1.PodSecurityContext
 
 	// GetSysctls returns the sysctl parameters to set for the container.
 	// Sysctls allow configuring kernel parameters at runtime.
@@ -324,6 +334,15 @@ func (spec *StarRocksFeProxySpec) IsReadOnlyRootFilesystem() *bool {
 // fe proxy does not have field Sysctls, the reason why implementing this method is
 // that StarRocksFeProxySpec needs to implement SpecInterface interface
 func (spec *StarRocksFeProxySpec) GetSysctls() []corev1.Sysctl { return nil }
+
+// GetSecurityContext
+// fe proxy runs nginx with a security context of its own, which can not be changed by the CR
+func (spec *StarRocksFeProxySpec) GetSecurityContext() *corev1.SecurityContext { return nil }
+
+// GetPodSecurityContext
+// fe proxy does not have field PodSecurityContext, the reason why implementing this method is
+// that StarRocksFeProxySpec needs to implement SpecInterface interface
+func (spec *StarRocksFeProxySpec) GetPodSecurityContext() *corev1.PodSecurityContext { return nil }
 
 // GetMinReadySeconds
 // fe proxy does not have field MinReadySeconds, the reason why implementing this method is
