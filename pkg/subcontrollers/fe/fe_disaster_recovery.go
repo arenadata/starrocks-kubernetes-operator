@@ -61,7 +61,7 @@ func EnterDisasterRecoveryMode(ctx context.Context, k8sClient client.Client,
 
 	switch drStatus.Phase {
 	case v1.DRPhaseTodo:
-		if !hasClusterSnapshotConf(feSpec.ConfigMaps) {
+		if !hasClusterSnapshotConf(feSpec.ConfigMaps, feSpec.Secrets) {
 			drStatus.Phase = v1.DRPhaseTodo
 			reason := "cluster_snapshot.yaml is not mounted"
 			drStatus.Reason = reason
@@ -85,18 +85,24 @@ func EnterDisasterRecoveryMode(ctx context.Context, k8sClient client.Client,
 	return nil
 }
 
-func hasClusterSnapshotConf(configMaps []v1.ConfigMapReference) bool {
-	// check all the mount paths, to make sure cluster_snapshot.yaml is mounted
-	hasConf := false
-	for _, sv := range configMaps {
+// hasClusterSnapshotConf checks all the mount paths, to make sure cluster_snapshot.yaml is mounted, no
+// matter whether the configuration comes from a ConfigMap or from a Secret.
+func hasClusterSnapshotConf(configMaps []v1.ConfigMapReference, secrets []v1.SecretReference) bool {
+	mounts := make([]v1.MountInfo, 0, len(configMaps)+len(secrets))
+	for i := range configMaps {
+		mounts = append(mounts, v1.MountInfo(configMaps[i]))
+	}
+	for i := range secrets {
+		mounts = append(mounts, v1.MountInfo(secrets[i]))
+	}
+	for _, sv := range mounts {
 		if strings.Contains(sv.SubPath, "cluster_snapshot.yaml") ||
 			strings.HasSuffix(sv.MountPath, "fe/conf") ||
 			strings.HasSuffix(sv.MountPath, "fe/conf/") {
-			hasConf = true
-			break
+			return true
 		}
 	}
-	return hasConf
+	return false
 }
 
 func rewriteStatefulSetForDisasterRecovery(expectSts *appsv1.StatefulSet, generation int64, queryPort int32) *appsv1.StatefulSet {

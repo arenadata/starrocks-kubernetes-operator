@@ -275,6 +275,7 @@ func TestRewriteStatefulSetForDisasterRecovery(t *testing.T) {
 func Test_hasClusterSnapshotConf(t *testing.T) {
 	type args struct {
 		configMaps []v1.ConfigMapReference
+		secrets    []v1.SecretReference
 	}
 	tests := []struct {
 		name string
@@ -313,7 +314,7 @@ func Test_hasClusterSnapshotConf(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := hasClusterSnapshotConf(tt.args.configMaps); got != tt.want {
+			if got := hasClusterSnapshotConf(tt.args.configMaps, tt.args.secrets); got != tt.want {
 				t.Errorf("hasClusterSnapshotConf() = %v, want %v", got, tt.want)
 			}
 		})

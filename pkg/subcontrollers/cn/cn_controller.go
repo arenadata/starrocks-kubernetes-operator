@@ -484,7 +484,7 @@ func (cc *CnController) ClearCluster(ctx context.Context, src *srapi.StarRocksCl
 func (cc *CnController) GetCnConfig(ctx context.Context,
 	cnSpec *srapi.StarRocksCnSpec, namespace string) (map[string]interface{}, error) {
 	return k8sutils.GetConfig(ctx, cc.k8sClient, cnSpec.ConfigMapInfo,
-		cnSpec.ConfigMaps, pod.GetConfigDir(cnSpec), "cn.conf",
+		cnSpec.ConfigMaps, cnSpec.Secrets, pod.GetConfigDir(cnSpec), "cn.conf",
 		namespace)
 }
 

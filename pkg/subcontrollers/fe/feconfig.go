@@ -16,7 +16,7 @@ import (
 func GetFEConfig(ctx context.Context, client client.Client,
 	feSpec *srapi.StarRocksFeSpec, namespace string) (map[string]interface{}, error) {
 	return k8sutils.GetConfig(ctx, client, feSpec.ConfigMapInfo,
-		feSpec.ConfigMaps, pod.GetConfigDir(feSpec), "fe.conf",
+		feSpec.ConfigMaps, feSpec.Secrets, pod.GetConfigDir(feSpec), "fe.conf",
 		namespace)
 }
 

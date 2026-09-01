@@ -308,6 +308,21 @@ starRocksCnSpec:
     resolveKey: be.conf
 ```
 
+The configuration is mounted over the conf directory of the installation, `/opt/starrocks/<component>/conf`.
+A configuration usually carries credentials - the LDAP bind password, the passwords of the keystores - so
+prefer a Secret over a ConfigMap for it. A Secret is referenced through `secrets`, by the directory it is
+mounted at, and the operator reads the ports of the component out of it just as it does from a ConfigMap:
+
+```yaml
+starRocksFeSpec:
+  secrets:
+  - name: fe-config
+    mountPath: /opt/starrocks/fe/conf
+```
+
+Note that the mount replaces the conf directory as a whole, so the ConfigMap or the Secret has to carry
+every configuration file the component needs, starting with `fe.conf` / `be.conf` / `cn.conf`.
+
 ## FAQ
 
 **Issue description:** When a custom resource StarRocksCluster is installed using `kubectl apply -f xxx`, an error is

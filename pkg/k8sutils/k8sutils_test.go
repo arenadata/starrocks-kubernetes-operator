@@ -905,3 +905,87 @@ func TestResolveConfigMap(t *testing.T) {
 	_, ok := res["http_port"]
 	require.Equal(t, true, ok)
 }
+
+func TestResolveSecret(t *testing.T) {
+	secret := corev1.Secret{
+		Data: map[string][]byte{
+			"fe.conf": []byte("http_port = 18030"),
+		},
+	}
+
+	res, err := k8sutils.ResolveSecret(&secret, "fe.conf")
+	require.NoError(t, err)
+	require.Equal(t, int32(18030), rutils.GetPort(res, rutils.HTTP_PORT))
+
+	res, err = k8sutils.ResolveSecret(&secret, "be.conf")
+	require.NoError(t, err)
+	require.Equal(t, 0, len(res))
+}
+
+// The configuration of a component is expected to be delivered as a Secret mounted over the conf directory
+// of the installation. The operator has to read the ports from it, the services and the probes depend on them.
+func TestGetConfigFromSecret(t *testing.T) {
+	const confDir = "/opt/starrocks/fe/conf"
+
+	newClient := func() client.Client {
+		return fake.NewFakeClient(srapi.Scheme,
+			&corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "fe-conf", Namespace: "default"},
+				Data:       map[string][]byte{"fe.conf": []byte("http_port = 18030")},
+			},
+			&corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: "fe-cm", Namespace: "default"},
+				Data:       map[string]string{"fe.conf": "http_port = 28030"},
+			},
+		)
+	}
+
+	tests := []struct {
+		name          string
+		configMapInfo srapi.ConfigMapInfo
+		configMaps    []srapi.ConfigMapReference
+		secrets       []srapi.SecretReference
+		wantHTTPPort  int32
+	}{
+		{
+			name:         "secret mounted over the conf directory",
+			secrets:      []srapi.SecretReference{{Name: "fe-conf", MountPath: confDir}},
+			wantHTTPPort: 18030,
+		},
+		{
+			name:         "secret mounted as a single file",
+			secrets:      []srapi.SecretReference{{Name: "fe-conf", MountPath: confDir + "/fe.conf", SubPath: "fe.conf"}},
+			wantHTTPPort: 18030,
+		},
+		{
+			name:         "secret mounted somewhere else is not the configuration",
+			secrets:      []srapi.SecretReference{{Name: "fe-conf", MountPath: "/etc/keytabs"}},
+			wantHTTPPort: rutils.GetPort(nil, rutils.HTTP_PORT),
+		},
+		{
+			name:         "a secret that does not exist is not an error",
+			secrets:      []srapi.SecretReference{{Name: "missing", MountPath: confDir}},
+			wantHTTPPort: rutils.GetPort(nil, rutils.HTTP_PORT),
+		},
+		{
+			name:         "a configmap mounted over the conf directory still works",
+			configMaps:   []srapi.ConfigMapReference{{Name: "fe-cm", MountPath: confDir}},
+			wantHTTPPort: 28030,
+		},
+		{
+			name:          "the legacy configMapInfo wins",
+			configMapInfo: srapi.ConfigMapInfo{ConfigMapName: "fe-cm", ResolveKey: "fe.conf"},
+			secrets:       []srapi.SecretReference{{Name: "fe-conf", MountPath: confDir}},
+			wantHTTPPort:  28030,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res, err := k8sutils.GetConfig(context.Background(), newClient(), tt.configMapInfo,
+				tt.configMaps, tt.secrets, confDir, "fe.conf", "default")
+			require.NoError(t, err)
+			require.Equal(t, tt.wantHTTPPort, rutils.GetPort(res, rutils.HTTP_PORT))
+		})
+	}
+}

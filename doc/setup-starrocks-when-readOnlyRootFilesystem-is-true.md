@@ -1,61 +1,32 @@
 # Background
 
-StarRocks has three components: Frontend (FE), Backend (BE), and Compute Node(CN). When the `readOnlyRootFilesystem` is
-set to `true`, the components of StarRocks cannot start normally. This is because the components of StarRocks write data
-to the disk, and the `readOnlyRootFilesystem` setting prevents the components from writing data to the disk.
+StarRocks has three components: Frontend (FE), Backend (BE), and Compute Node (CN). All of them write into
+their installation directory by default, which is what `readOnlyRootFilesystem: true` forbids:
 
-For the FE component, FE writes data to the following directories:
+| what | FE | BE / CN |
+|------|----|---------|
+| pid file | `bin/fe.pid` | `bin/{be,cn}.pid` |
+| configuration | `conf/fe.conf` | `conf/{be,cn}.conf` |
+| temporary files | `temp_dir`, `java.io.tmpdir` | `java.io.tmpdir` of the embedded JVM |
+| plugins, small files | `plugins`, `small_files` | `lib/small_file`, `lib/udf`, `lib/udf-runtime` |
+| spilled data | - | `spill` |
 
-```bash
-# in fe directory
-drwxr-xr-x 2 root      root      4.0K Nov 19 11:27 plugins
-drwxr-xr-x 4 root      root      4.0K Nov 19 11:27 temp_dir
+The operator and the images take care of the first three:
 
-# in fe/bin directory
--rw-r--r-- 1 root      root         2 Nov 19 11:27 fe.pid
+* the configuration is mounted over `conf` and nothing copies it anywhere, so the mount can be read-only
+  (a Secret is the recommended source, it usually holds credentials);
+* an `emptyDir` is mounted at `/tmp` and `PID_DIR` (plus `UDF_RUNTIME_DIR` for BE and CN) points at it;
+* `fsGroup` is set for the pod, so the mounted Secret stays readable for the StarRocks process.
 
-# in fe/conf directory
-lrwxrwxrwx 1 root      root        30 Nov 19 11:27 fe.conf -> /etc/starrocks/fe/conf/fe.conf
-```
+Everything else has to be pointed at a volume in the configuration, see the examples below.
 
-For the BE component, BE writes data to the following directories:
+> Note: this needs an image whose entrypoint scripts do not write into the installation directory,
+> StarRocks `4.4.0` / `4.0.10.1` or later. With an older image the components either fail to start or
+> ignore the mounted configuration. Overriding `command` / `args` (or the `entrypoint` value of the chart)
+> is not needed any more and is discouraged: it replaces the ENTRYPOINT of the image, which is what reaps
+> the zombie processes of the container.
 
-```bash
-# in be directory
-drwxr-xr-x 2 root      root      4.0K Nov 19 11:27 spill
-
-# in be/conf directory
-lrwxrwxrwx 1 root      root        30 Nov 19 11:27 be.conf -> /etc/starrocks/be/conf/be.conf
-
-# in be/bin directory
--rw-r----- 1 root      root         3 Nov 19 11:27 be.pid
-
-# in be/lib directory
-drwxr-xr-x   2 root      root      4.0K Nov 19 11:27 jdbc_drivers
-drwxr-xr-x   2 root      root      4.0K Nov 19 11:27 small_file
-drwxr-xr-x 130 root      root      4.0K Nov 19 11:27 udf
-drwxr-xr-x   2 root      root      4.0K Nov 19 11:27 udf-runtime
-```
-
-This document describes how to set up StarRocks when the `readOnlyRootFilesystem` field is set to `true`.
-
-# How
-
-We create and mount a volume, and in the entrypoint script, we will copy everything from the original directory to the
-mounted volume. This way, the components of StarRocks can write data to the mounted volume.
-
-> Note: you should use the operator version `v1.9.9` or later.
-
-# Steps
-
-There are two ways to deploy StarRocks cluster:
-
-1. Deploy StarRocks cluster with `StarRocksCluster` CR yaml.
-2. Deploy StarRocks cluster with Helm chart.
-
-Therefore, there are two ways to set up StarRocks when the `readOnlyRootFilesystem` field is set to `true`.
-
-## By using StarRocksCluster CR yaml
+# By using StarRocksCluster CR yaml
 
 ```yaml
 apiVersion: starrocks.com/v1
@@ -65,215 +36,148 @@ metadata:
   namespace: starrocks
 spec:
   starRocksFeSpec:
-    readOnlyRootFilesystem: true
-    runAsNonRoot: true
-    configMapInfo:
-      configMapName: kube-starrocks-fe-cm
-      resolveKey: fe.conf
-    storageVolumes:
-    - mountPath: /opt/starrocks-artifacts
-      name: fe-artifacts
-      storageClassName: emptyDir
-      storageSize: 20Gi
-    - mountPath: /opt/starrocks-meta
-      name: fe-meta   # must be this
-      storageSize: 10Gi
-    - mountPath: /opt/starrocks-log
-      name: fe-log    # must be this
-      storageSize: 10Gi
-    command: ["bash", "-c"]
-    args:
-      - cp -r /opt/starrocks/* /opt/starrocks-artifacts && exec /opt/starrocks-artifacts/fe_entrypoint.sh $FE_SERVICE_NAME
-    feEnvVars:
-    - name: STARROCKS_ROOT
-      value: /opt/starrocks-artifacts
-    image: starrocks/fe-ubuntu:3.2.2
-    imagePullPolicy: IfNotPresent
+    image: starrocks/fe-ubuntu:latest
     replicas: 1
-    requests:
-      cpu: 1m
-      memory: 22Mi
-  starRocksBeSpec:
     readOnlyRootFilesystem: true
     runAsNonRoot: true
-    configMapInfo:
-      configMapName: kube-starrocks-be-cm
-      resolveKey: be.conf
+    secrets:
+    # the configuration is mounted over the conf directory of the installation
+    - name: kube-starrocks-fe-conf
+      mountPath: /opt/starrocks/fe/conf
     storageVolumes:
-    - mountPath: /opt/starrocks-artifacts
-      name: be-artifacts
+    - name: fe-meta
+      mountPath: /opt/starrocks/fe/meta
+      storageSize: 10Gi
+    - name: fe-log
+      mountPath: /opt/starrocks/fe/log
+      storageSize: 10Gi
+    # temp_dir, plugins and small_files of the FE, see the configuration below
+    - name: fe-tmp
+      mountPath: /opt/starrocks/fe/tmp
       storageClassName: emptyDir
-      storageSize: 20Gi
-    - mountPath: /opt/starrocks-storage
-      name: be-storage  # must be this
+      storageSize: 1Gi
+  starRocksBeSpec:
+    image: starrocks/be-ubuntu:latest
+    replicas: 1
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    secrets:
+    - name: kube-starrocks-be-conf
+      mountPath: /opt/starrocks/be/conf
+    storageVolumes:
+    - name: be-data
+      mountPath: /opt/starrocks/be/storage
+      storageSize: 100Gi
+    - name: be-log
+      mountPath: /opt/starrocks/be/log
       storageSize: 10Gi
-    - mountPath: /opt/starrocks-log
-      name: be-log  # must be this
+    # spill, small files and UDFs of the BE, see the configuration below
+    - name: be-tmp
+      mountPath: /opt/starrocks/be/tmp
+      storageClassName: emptyDir
       storageSize: 10Gi
-    command: ["bash", "-c"]
-    args:
-      - cp -r /opt/starrocks/* /opt/starrocks-artifacts && exec /opt/starrocks-artifacts/be_entrypoint.sh $FE_SERVICE_NAME
-    beEnvVars:
-    - name: STARROCKS_ROOT
-      value: /opt/starrocks-artifacts
-    image: starrocks/be-ubuntu:3.2.2
-    imagePullPolicy: IfNotPresent
-    replicas: 2
-    requests:
-      cpu: 1m
-      memory: 10Mi
 
 ---
 
 apiVersion: v1
-data:
+kind: Secret
+metadata:
+  name: kube-starrocks-fe-conf
+  namespace: starrocks
+type: Opaque
+stringData:
   fe.conf: |
     LOG_DIR = ${STARROCKS_HOME}/log
     DATE = "$(date +%Y%m%d-%H%M%S)"
-    JAVA_OPTS="-Dlog4j2.formatMsgNoLookups=true -Xmx8192m -XX:+UseG1GC -Xlog:gc*:${LOG_DIR}/fe.gc.log.$DATE:time"
+    JAVA_OPTS="-Dlog4j2.formatMsgNoLookups=true -Xmx8192m -XX:+UseG1GC -Xlog:gc*:${LOG_DIR}/fe.gc.log.$DATE:time -XX:ErrorFile=${LOG_DIR}/hs_err_pid%p.log"
     http_port = 8030
     rpc_port = 9020
     query_port = 9030
     edit_log_port = 9010
-    mysql_service_nio_enabled = true
     sys_log_level = INFO
-    
-    # config for meta and log
-    meta_dir = /opt/starrocks-meta
-    dump_log_dir = /opt/starrocks-log
-    sys_log_dir = /opt/starrocks-log
-    audit_log_dir = /opt/starrocks-log
-kind: ConfigMap
-metadata:
-  name: kube-starrocks-fe-cm
-  namespace: starrocks
+
+    # the directories that default into the installation directory
+    tmp_dir = /opt/starrocks/fe/tmp/temp_dir
+    plugin_dir = /opt/starrocks/fe/tmp/plugins
+    small_file_dir = /opt/starrocks/fe/tmp/small_files
 
 ---
 
 apiVersion: v1
-data:
+kind: Secret
+metadata:
+  name: kube-starrocks-be-conf
+  namespace: starrocks
+type: Opaque
+stringData:
   be.conf: |
     be_port = 9060
     webserver_port = 8040
     heartbeat_service_port = 9050
     brpc_port = 8060
     sys_log_level = INFO
-    default_rowset_type = beta
 
-    # config for storage and log
-    storage_root_path = /opt/starrocks-storage
-    sys_log_dir = /opt/starrocks-log
-kind: ConfigMap
-metadata:
-  name: kube-starrocks-be-cm
-  namespace: starrocks
+    # the directories that default into the installation directory
+    spill_local_storage_dir = /opt/starrocks/be/tmp/spill
+    small_file_dir = /opt/starrocks/be/tmp/small_file
+    user_function_dir = /opt/starrocks/be/tmp/udf
 ```
 
-## By using Helm Chart
+# By using Helm Chart
 
-If you are using the `kube-starrocks` Helm chart, add the following snippets to `values.yaml`.
-
-> Note: you should use the chart version `v1.9.9` or later.
+The chart renders the `config` values into a Secret and mounts it over the conf directory itself, so only
+the volumes and the redirected paths are left to declare:
 
 ```yaml
-operator:
-  starrocksOperator:
-    image:
-      repository: starrocks/operator
-      tag: v1.9.9
-    imagePullPolicy: IfNotPresent
-    resources:
-      requests:
-        cpu: 1m
-        memory: 20Mi
 starrocks:
   starrocksFESpec:
     readOnlyRootFilesystem: true
     runAsNonRoot: true
     storageSpec:
-      name: fe  # must be this
+      name: fe
       storageSize: 10Gi
-      storageMountPath: /opt/starrocks-meta
       logStorageSize: 10Gi
-      logMountPath: /opt/starrocks-log
     emptyDirs:
-    - name: fe-artifacts
-      mountPath: /opt/starrocks-artifacts
-    entrypoint:
-      script: |
-        #! /bin/bash
-        cp -r /opt/starrocks/* /opt/starrocks-artifacts
-        exec /opt/starrocks/fe_entrypoint.sh $FE_SERVICE_NAME
-    feEnvVars:
-    - name: STARROCKS_ROOT
-      value: /opt/starrocks-artifacts
-    image:
-      repository: starrocks/fe-ubuntu
-      tag: 3.2.2
-    resources:
-      limits:
-        cpu: 2
-        memory: 4Gi
-      requests:
-        cpu: 1m
-        memory: 20Mi
+    - name: fe-tmp
+      mountPath: /opt/starrocks/fe/tmp
     config: |
       LOG_DIR = ${STARROCKS_HOME}/log
       DATE = "$(date +%Y%m%d-%H%M%S)"
-      JAVA_OPTS="-Dlog4j2.formatMsgNoLookups=true -Xmx8192m -XX:+UseG1GC -Xlog:gc*:${LOG_DIR}/fe.gc.log.$DATE:time"
+      JAVA_OPTS="-Dlog4j2.formatMsgNoLookups=true -Xmx8192m -XX:+UseG1GC -Xlog:gc*:${LOG_DIR}/fe.gc.log.$DATE:time -XX:ErrorFile=${LOG_DIR}/hs_err_pid%p.log"
       http_port = 8030
       rpc_port = 9020
       query_port = 9030
       edit_log_port = 9010
-      mysql_service_nio_enabled = true
       sys_log_level = INFO
-      # config for meta and log
-      meta_dir = /opt/starrocks-meta
-      dump_log_dir = /opt/starrocks-log
-      sys_log_dir = /opt/starrocks-log
-      audit_log_dir = /opt/starrocks-log
+      tmp_dir = /opt/starrocks/fe/tmp/temp_dir
+      plugin_dir = /opt/starrocks/fe/tmp/plugins
+      small_file_dir = /opt/starrocks/fe/tmp/small_files
   starrocksBeSpec:
     readOnlyRootFilesystem: true
     runAsNonRoot: true
     storageSpec:
-      name: be  # must be this
-      storageSize: 10Gi
-      storageMountPath: /opt/starrocks-storage
+      name: be
+      storageSize: 100Gi
       logStorageSize: 10Gi
-      logMountPath: /opt/starrocks-log
+      # mounted at /opt/starrocks/be/spill, which is where spill_local_storage_dir points by default
       spillStorageSize: 10Gi
-      spillMountPath: /opt/starrocks-spill
     emptyDirs:
-    - name: be-artifacts
-      mountPath: /opt/starrocks-artifacts
-    entrypoint:
-      script: |
-        #! /bin/bash
-        cp -r /opt/starrocks/* /opt/starrocks-artifacts 
-        exec /opt/starrocks-artifacts/be_entrypoint.sh $FE_SERVICE_NAME
-    beEnvVars:
-    - name: STARROCKS_ROOT
-      value: /opt/starrocks-artifacts
-    image:
-      repository: starrocks/be-ubuntu
-      tag: 3.2.2
-    replicas: 1
-    resources:
-      limits:
-        cpu: 8
-        memory: 8Gi
-      requests:
-        cpu: 1m
-        memory: 10Mi
+    - name: be-tmp
+      mountPath: /opt/starrocks/be/tmp
     config: |
       be_port = 9060
       webserver_port = 8040
       heartbeat_service_port = 9050
       brpc_port = 8060
       sys_log_level = INFO
-      default_rowset_type = beta
-      # config for storage and log
-      storage_root_path = /opt/starrocks-storage
-      sys_log_dir = /opt/starrocks-log
-      spill_local_storage_dir = /opt/starrocks-spill
+      small_file_dir = /opt/starrocks/be/tmp/small_file
+      user_function_dir = /opt/starrocks/be/tmp/udf
 ```
+
+# Migrating from the old recipe
+
+Earlier versions of this document worked around the missing support by copying the whole installation into
+an `emptyDir` at start up (`cp -r /opt/starrocks/* /opt/starrocks-artifacts`) and by pointing
+`STARROCKS_ROOT` at the copy. That is not needed any more: remove the `command` / `args` (or `entrypoint`)
+override, the artifacts volume and the `STARROCKS_ROOT` environment variable, and move the configuration
+into a Secret mounted over the conf directory.

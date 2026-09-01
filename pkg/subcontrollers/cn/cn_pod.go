@@ -36,9 +36,7 @@ import (
 )
 
 const (
-	_logName         = "cn-log"
-	_cnConfigPath    = "/etc/starrocks/cn/conf"
-	_envCnConfigPath = "CONFIGMAP_MOUNT_PATH"
+	_logName = "cn-log"
 )
 
 // buildPodTemplate construct the podTemplate for deploy cn.
@@ -50,10 +48,13 @@ func (cc *CnController) buildPodTemplate(ctx context.Context, object srobject.St
 		vols, volumeMounts = pod.MountEmptyDirVolume(vols, volumeMounts, _logName, pod.GetLogDir(cnSpec), "")
 	}
 
-	// mount configmap, secrets to pod if needed
-	vols, volumeMounts = pod.MountConfigMapInfo(vols, volumeMounts, cnSpec.ConfigMapInfo, _cnConfigPath)
+	// Mount the configuration and the secrets. The configuration is mounted over the conf directory of
+	// the installation: the entrypoint scripts of the image do not copy it anywhere any more, they read
+	// it where it is mounted.
+	vols, volumeMounts = pod.MountConfigMapInfo(vols, volumeMounts, cnSpec.ConfigMapInfo, pod.GetConfigDir(cnSpec))
 	vols, volumeMounts = pod.MountConfigMaps(cnSpec, vols, volumeMounts, cnSpec.ConfigMaps)
-	vols, volumeMounts = pod.MountSecrets(vols, volumeMounts, cnSpec.Secrets)
+	vols, volumeMounts = pod.MountSecrets(cnSpec, vols, volumeMounts, cnSpec.Secrets)
+	vols, volumeMounts = pod.MountWritableTmpDir(cnSpec, vols, volumeMounts)
 	if err := k8sutils.CheckVolumes(vols, volumeMounts); err != nil {
 		return nil, err
 	}
@@ -92,13 +93,6 @@ func (cc *CnController) buildPodTemplate(ctx context.Context, object srobject.St
 	}
 	if pod.GetStarRocksRootPath(cnSpec.CnEnvVars) != pod.GetStarRocksDefaultRootPath() {
 		cnContainer.WorkingDir = pod.GetStarRocksRootPath(cnSpec.CnEnvVars)
-	}
-
-	if cnSpec.ConfigMapInfo.ConfigMapName != "" && cnSpec.ConfigMapInfo.ResolveKey != "" {
-		cnContainer.Env = append(cnContainer.Env, corev1.EnvVar{
-			Name:  _envCnConfigPath,
-			Value: _cnConfigPath,
-		})
 	}
 
 	podSpec := pod.Spec(cnSpec, cnContainer, vols)

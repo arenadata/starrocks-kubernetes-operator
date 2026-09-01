@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/StarRocks/starrocks-kubernetes-operator/cmd/config"
@@ -70,8 +71,14 @@ func TestMountConfigMapInfo(t *testing.T) {
 	}
 }
 
+var (
+	secretFileMode     = v1.SecretFileMode
+	executableFileMode = v1.ExecutableFileMode
+)
+
 func TestMountSecrets(t *testing.T) {
 	type args struct {
+		spec         v1.SpecInterface
 		volumes      []corev1.Volume
 		volumeMounts []corev1.VolumeMount
 		secrets      []v1.SecretReference
@@ -101,7 +108,8 @@ func TestMountSecrets(t *testing.T) {
 					Name: "s1-1614",
 					VolumeSource: corev1.VolumeSource{
 						Secret: &corev1.SecretVolumeSource{
-							SecretName: "s1",
+							SecretName:  "s1",
+							DefaultMode: &secretFileMode,
 						},
 					},
 				},
@@ -109,7 +117,8 @@ func TestMountSecrets(t *testing.T) {
 					Name: "s2-1229",
 					VolumeSource: corev1.VolumeSource{
 						Secret: &corev1.SecretVolumeSource{
-							SecretName: "s2",
+							SecretName:  "s2",
+							DefaultMode: &secretFileMode,
 						},
 					},
 				},
@@ -128,7 +137,7 @@ func TestMountSecrets(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1 := MountSecrets(tt.args.volumes, tt.args.volumeMounts, tt.args.secrets)
+			got, got1 := MountSecrets(tt.args.spec, tt.args.volumes, tt.args.volumeMounts, tt.args.secrets)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("MountSecrets() got = %v, want %v", got, tt.want)
 			}
@@ -422,4 +431,60 @@ func TestSpecialStorageClassName(t *testing.T) {
 			}
 		})
 	}
+}
+
+func specWithReadOnlyRootFilesystem(readOnly bool) v1.SpecInterface {
+	return &v1.StarRocksFeSpec{
+		StarRocksComponentSpec: v1.StarRocksComponentSpec{
+			ReadOnlyRootFilesystem: &readOnly,
+		},
+	}
+}
+
+// A Secret carrying a script the container executes itself has to stay executable, everything else is
+// mounted read-only for the owner and the fsGroup.
+func TestMountSecretsExecutableScript(t *testing.T) {
+	spec := &v1.StarRocksFeSpec{
+		StarRocksComponentSpec: v1.StarRocksComponentSpec{
+			Command: []string{"bash", "-c"},
+		},
+	}
+	secrets := []v1.SecretReference{
+		{Name: "script", MountPath: "/opt/starrocks/entrypoint.sh", SubPath: "entrypoint.sh"},
+		{Name: "keytab", MountPath: "/etc/security/keytabs"},
+	}
+
+	volumes, _ := MountSecrets(spec, nil, nil, secrets)
+
+	require.Equal(t, 2, len(volumes))
+	require.Equal(t, executableFileMode, *volumes[0].Secret.DefaultMode)
+	require.Equal(t, secretFileMode, *volumes[1].Secret.DefaultMode)
+}
+
+func TestMountWritableTmpDir(t *testing.T) {
+	t.Run("mounted for a read-only root filesystem", func(t *testing.T) {
+		volumes, volumeMounts := MountWritableTmpDir(specWithReadOnlyRootFilesystem(true), nil, nil)
+		require.Equal(t, 1, len(volumes))
+		require.NotNil(t, volumes[0].EmptyDir)
+		require.Equal(t, 1, len(volumeMounts))
+		require.Equal(t, WritableTmpDir, volumeMounts[0].MountPath)
+		require.Equal(t, volumes[0].Name, volumeMounts[0].Name)
+	})
+
+	t.Run("not mounted for a writable root filesystem", func(t *testing.T) {
+		volumes, volumeMounts := MountWritableTmpDir(specWithReadOnlyRootFilesystem(false), nil, nil)
+		require.Equal(t, 0, len(volumes))
+		require.Equal(t, 0, len(volumeMounts))
+	})
+
+	t.Run("not mounted when the deployment mounts /tmp itself", func(t *testing.T) {
+		existingVolumes := []corev1.Volume{{Name: "my-tmp"}}
+		existingMounts := []corev1.VolumeMount{{Name: "my-tmp", MountPath: WritableTmpDir}}
+
+		volumes, volumeMounts := MountWritableTmpDir(specWithReadOnlyRootFilesystem(true),
+			existingVolumes, existingMounts)
+
+		require.Equal(t, existingVolumes, volumes)
+		require.Equal(t, existingMounts, volumeMounts)
+	})
 }

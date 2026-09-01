@@ -100,13 +100,17 @@ spec:
     imagePullSecrets:
       {{- toYaml .Values.spec.imagePullSecrets | nindent 6 }}
     {{- end }}
-    {{- if .Values.spec.secrets }}
     secrets:
+    {{- if .Values.spec.config }}
+    # the configuration is mounted over the conf directory of the installation, the CN reads it from
+    # there and the operator reads the ports out of it
+    - name: {{ template "starrockswarehouse.config.secret.name" . }}
+      mountPath: {{ template "starrockswarehouse.conf.dir" . }}
+    {{- end }}
     {{- range .Values.spec.secrets }}
     - name: {{ .name }}
       mountPath: {{ .mountPath }}
       subPath: {{ .subPath }}
-    {{- end }}
     {{- end }}
     {{- if .Values.spec.configMaps }}
     configMaps:
@@ -116,9 +120,6 @@ spec:
         subPath: {{ .subPath }}
     {{- end }}
     {{- end }}
-    configMapInfo:
-      configMapName: {{template  "starrockswarehouse.configmap.name" . }}
-      resolveKey: cn.conf
     {{- if .Values.spec.storageSpec.name }}
     storageVolumes:
     - name: {{ .Values.spec.storageSpec.name }}{{template "starrockscluster.cn.data.suffix" . }}

@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 
@@ -300,6 +301,9 @@ func TestSpec(t *testing.T) {
 
 func TestSecurityContext(t *testing.T) {
 	onrootMismatch := corev1.FSGroupChangeOnRootMismatch
+	// FSGroup is set for every component, so that the files of a Secret mounted with SecretFileMode
+	// belong to a group the StarRocks process is a member of.
+	fsGroup := v1.StarRocksGroupID
 
 	type args struct {
 		spec v1.SpecInterface
@@ -318,6 +322,7 @@ func TestSecurityContext(t *testing.T) {
 			},
 			want: &corev1.PodSecurityContext{
 				FSGroupChangePolicy: &onrootMismatch,
+				FSGroup:             &fsGroup,
 			},
 		},
 		{
@@ -327,6 +332,21 @@ func TestSecurityContext(t *testing.T) {
 			},
 			want: &corev1.PodSecurityContext{
 				FSGroupChangePolicy: &onrootMismatch,
+				FSGroup:             &fsGroup,
+			},
+		},
+		{
+			name: "run as non root keeps its own group",
+			args: args{
+				spec: &v1.StarRocksFeSpec{
+					StarRocksComponentSpec: v1.StarRocksComponentSpec{
+						RunAsNonRoot: func() *bool { b := true; return &b }(),
+					},
+				},
+			},
+			want: &corev1.PodSecurityContext{
+				FSGroupChangePolicy: &onrootMismatch,
+				FSGroup:             &fsGroup,
 			},
 		},
 	}
@@ -599,4 +619,73 @@ func TestContainerCommandAndArgs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func envValue(envs []corev1.EnvVar, name string) (string, bool) {
+	for i := range envs {
+		if envs[i].Name == name {
+			return envs[i].Value, true
+		}
+	}
+	return "", false
+}
+
+// With a read-only root filesystem the pid file and the runtime directory of the UDFs can not stay in the
+// installation directory, they go to the emptyDir mounted at /tmp.
+func TestEnvsForReadOnlyRootFilesystem(t *testing.T) {
+	readOnly := func(value bool) *bool { return &value }
+
+	t.Run("fe writes its pid file to the writable directory", func(t *testing.T) {
+		spec := &v1.StarRocksFeSpec{
+			StarRocksComponentSpec: v1.StarRocksComponentSpec{ReadOnlyRootFilesystem: readOnly(true)},
+		}
+
+		envs := Envs(spec, map[string]interface{}{}, "fe-service", "default", nil)
+
+		pidDir, ok := envValue(envs, "PID_DIR")
+		require.True(t, ok)
+		require.Equal(t, WritableTmpDir, pidDir)
+		_, ok = envValue(envs, "UDF_RUNTIME_DIR")
+		require.False(t, ok, "FE has no UDF runtime directory")
+	})
+
+	t.Run("be also gets a writable udf runtime directory", func(t *testing.T) {
+		spec := &v1.StarRocksBeSpec{
+			StarRocksComponentSpec: v1.StarRocksComponentSpec{ReadOnlyRootFilesystem: readOnly(true)},
+		}
+
+		envs := Envs(spec, map[string]interface{}{}, "fe-service", "default", nil)
+
+		pidDir, ok := envValue(envs, "PID_DIR")
+		require.True(t, ok)
+		require.Equal(t, WritableTmpDir, pidDir)
+		udfDir, ok := envValue(envs, "UDF_RUNTIME_DIR")
+		require.True(t, ok)
+		require.Equal(t, WritableTmpDir+"/udf-runtime", udfDir)
+	})
+
+	t.Run("nothing is added for a writable root filesystem", func(t *testing.T) {
+		spec := &v1.StarRocksBeSpec{
+			StarRocksComponentSpec: v1.StarRocksComponentSpec{ReadOnlyRootFilesystem: readOnly(false)},
+		}
+
+		envs := Envs(spec, map[string]interface{}{}, "fe-service", "default", nil)
+
+		_, ok := envValue(envs, "PID_DIR")
+		require.False(t, ok)
+		_, ok = envValue(envs, "UDF_RUNTIME_DIR")
+		require.False(t, ok)
+	})
+
+	t.Run("the deployment can point the pid file somewhere else", func(t *testing.T) {
+		spec := &v1.StarRocksFeSpec{
+			StarRocksComponentSpec: v1.StarRocksComponentSpec{ReadOnlyRootFilesystem: readOnly(true)},
+		}
+
+		envs := Envs(spec, map[string]interface{}{}, "fe-service", "default",
+			[]corev1.EnvVar{{Name: "PID_DIR", Value: "/var/run/starrocks"}})
+
+		pidDir, _ := envValue(envs, "PID_DIR")
+		require.Equal(t, "/var/run/starrocks", pidDir)
+	})
 }

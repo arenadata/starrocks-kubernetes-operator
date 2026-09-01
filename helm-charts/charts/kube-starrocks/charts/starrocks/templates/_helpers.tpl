@@ -38,16 +38,37 @@ starrockscluster
 {{- print (include "starrockscluster.name" .) "-be" }}
 {{- end }}
 
-{{- define "starrockscluster.be.configmap.name" -}}
-{{- print (include "starrockscluster.be.name" .) "-cm" }}
+{{/*
+The configuration of a component is stored in a Secret: it holds credentials - the LDAP bind password,
+keystore passwords - and it is mounted over the conf directory of the installation, from where the
+component reads it directly.
+*/}}
+{{- define "starrockscluster.be.config.secret.name" -}}
+{{- print (include "starrockscluster.be.name" .) "-conf" }}
 {{- end }}
 
-{{- define "starrockscluster.fe.configmap.name" -}}
-{{- print (include "starrockscluster.fe.name" .) "-cm" }}
+{{- define "starrockscluster.fe.config.secret.name" -}}
+{{- print (include "starrockscluster.fe.name" .) "-conf" }}
 {{- end }}
 
-{{- define "starrockscluster.cn.configmap.name" -}}
-{{- print (include "starrockscluster.cn.name" .) "-cm" }}
+{{- define "starrockscluster.cn.config.secret.name" -}}
+{{- print (include "starrockscluster.cn.name" .) "-conf" }}
+{{- end }}
+
+{{/*
+The directories the components read their configuration from. They have to match the ones the operator
+derives from STARROCKS_ROOT, otherwise the operator can not read the ports out of the configuration.
+*/}}
+{{- define "starrockscluster.fe.conf.dir" -}}
+{{- print "/opt/starrocks/fe/conf" }}
+{{- end }}
+
+{{- define "starrockscluster.be.conf.dir" -}}
+{{- print "/opt/starrocks/be/conf" }}
+{{- end }}
+
+{{- define "starrockscluster.cn.conf.dir" -}}
+{{- print "/opt/starrocks/cn/conf" }}
 {{- end }}
 
 {{- define "starrockscluster.fe.config" -}}

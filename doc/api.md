@@ -469,9 +469,8 @@ The reason why we do not support defaultMode is that we use hash.HashObject to
 calculate the actual volume name. This volume name is used in pod template of statefulset,
 and if this MountInfo type has been changed, the volume name will be changed too, and
 that will make pods restart.
-The default mode is 0644, and in order to support to set permission information for a configMap
-or secret, we add should specify the subPath and specify a command or args in the container.
-And It will be set 0755.</p>
+The permissions of the mounted files are decided by the operator instead, see SecretFileMode and
+ExecutableFileMode.</p>
 </div>
 <table>
 <thead>
@@ -1431,8 +1430,12 @@ bool
 Default is false.
 Note that:
 1. This field cannot be set when spec.os.name is windows.
-2. The FE/BE/CN container should support read-only root filesystem. The newest version of FE/BE/CN is 3.3.6,
-and does not support read-only root filesystem</p>
+2. The image has to keep its configuration directory read-only and write its pid file outside of
+the installation. StarRocks images do so since 4.4.0/4.0.10.1; with an older image the
+components fail to start or silently ignore the mounted configuration.
+3. When it is enabled the operator mounts an emptyDir at /tmp and points PID_DIR (and
+UDF_RUNTIME_DIR for BE/CN) at it. Anything else the deployment writes to - the spill
+directory, small files, FE tmp_dir - has to be pointed at a volume in the configuration.</p>
 </td>
 </tr>
 <tr>
@@ -2644,5 +2647,5 @@ AutoScalingPolicy
 <hr/>
 <p><em>
 Generated with <code>gen-crd-api-reference-docs</code>
-on git commit <code>5385134</code>.
+on git commit <code>0c63e50</code>.
 </em></p>

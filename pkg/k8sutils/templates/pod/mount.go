@@ -105,10 +105,35 @@ func MountHostPathVolume(volumes []corev1.Volume, volumeMounts []corev1.VolumeMo
 	return volumes, volumeMounts
 }
 
+// WritableTmpDir is the one path a container with a read-only root filesystem can write to: the start
+// scripts put the pid file there and the JVM uses it as java.io.tmpdir.
+const WritableTmpDir = "/tmp"
+
+const tmpVolumeName = "starrocks-tmp"
+
+// MountWritableTmpDir mounts an emptyDir at WritableTmpDir when the container runs with a read-only root
+// filesystem and the deployment does not mount something there itself.
+func MountWritableTmpDir(spec v1.SpecInterface, volumes []corev1.Volume,
+	volumeMounts []corev1.VolumeMount) ([]corev1.Volume, []corev1.VolumeMount) {
+	if readOnly := spec.IsReadOnlyRootFilesystem(); readOnly == nil || !*readOnly {
+		return volumes, volumeMounts
+	}
+	for i := range volumeMounts {
+		if volumeMounts[i].MountPath == WritableTmpDir {
+			return volumes, volumeMounts
+		}
+	}
+	return MountEmptyDirVolume(volumes, volumeMounts, tmpVolumeName, WritableTmpDir, "")
+}
+
+// mountsAnExecutable reports whether what is mounted with the given subPath is a script the container
+// runs itself, in which case it has to be mounted executable instead of read-only.
+func mountsAnExecutable(spec v1.SpecInterface, subPath string) bool {
+	return subPath != "" && spec != nil && (spec.GetCommand() != nil || spec.GetArgs() != nil)
+}
+
 func MountConfigMaps(spec v1.SpecInterface, volumes []corev1.Volume, volumeMounts []corev1.VolumeMount,
 	references []v1.ConfigMapReference) ([]corev1.Volume, []corev1.VolumeMount) {
-	prerequisitesOfChangingMode := spec != nil && (spec.GetCommand() != nil || spec.GetArgs() != nil)
-
 	for _, reference := range references {
 		volumeName := getVolumeName(v1.MountInfo(reference))
 		volumes = append(volumes, corev1.Volume{
@@ -119,10 +144,9 @@ func MountConfigMaps(spec v1.SpecInterface, volumes []corev1.Volume, volumeMount
 						Name: reference.Name,
 					},
 					DefaultMode: func() *int32 {
-						if prerequisitesOfChangingMode && reference.SubPath != "" {
-							const executionPermission = int32(0755)
-							v := executionPermission
-							return &v
+						if mountsAnExecutable(spec, reference.SubPath) {
+							mode := v1.ExecutableFileMode
+							return &mode
 						}
 						return nil
 					}(),
@@ -161,15 +185,24 @@ func MountConfigMapInfo(volumes []corev1.Volume, volumeMounts []corev1.VolumeMou
 	return volumes, volumeMounts
 }
 
-func MountSecrets(volumes []corev1.Volume, volumeMounts []corev1.VolumeMount,
+// MountSecrets parse Secrets from spec and mount them to pod.
+// The files are mounted with SecretFileMode, so that the credentials a Secret carries are not readable
+// by every user of the container. The exception is a script mounted with a subPath, which the container
+// has to be able to execute.
+func MountSecrets(spec v1.SpecInterface, volumes []corev1.Volume, volumeMounts []corev1.VolumeMount,
 	references []v1.SecretReference) ([]corev1.Volume, []corev1.VolumeMount) {
 	for _, reference := range references {
 		volumeName := getVolumeName(v1.MountInfo(reference))
+		mode := v1.SecretFileMode
+		if mountsAnExecutable(spec, reference.SubPath) {
+			mode = v1.ExecutableFileMode
+		}
 		volumes = append(volumes, corev1.Volume{
 			Name: volumeName,
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: reference.Name,
+					SecretName:  reference.Name,
+					DefaultMode: &mode,
 				},
 			},
 		})

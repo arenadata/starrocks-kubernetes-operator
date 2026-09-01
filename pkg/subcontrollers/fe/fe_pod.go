@@ -28,10 +28,8 @@ import (
 )
 
 const (
-	_metaName             = "fe-meta"
-	_logName              = "fe-log"
-	_feConfigMountPath    = "/etc/starrocks/fe/conf"
-	_envFeConfigMountPath = "CONFIGMAP_MOUNT_PATH"
+	_metaName = "fe-meta"
+	_logName  = "fe-log"
 )
 
 // buildPodTemplate construct the podTemplate for deploy fe.
@@ -48,10 +46,13 @@ func (fc *FeController) buildPodTemplate(src *srapi.StarRocksCluster, config map
 		vols, volMounts = pod.MountEmptyDirVolume(vols, volMounts, _logName, pod.GetLogDir(feSpec), "")
 	}
 
-	// mount configmap, secrets to pod if needed
-	vols, volMounts = pod.MountConfigMapInfo(vols, volMounts, feSpec.ConfigMapInfo, _feConfigMountPath)
+	// Mount the configuration and the secrets. The configuration is mounted over the conf directory of
+	// the installation: the entrypoint scripts of the image do not copy it anywhere any more, they read
+	// it where it is mounted.
+	vols, volMounts = pod.MountConfigMapInfo(vols, volMounts, feSpec.ConfigMapInfo, pod.GetConfigDir(feSpec))
 	vols, volMounts = pod.MountConfigMaps(feSpec, vols, volMounts, feSpec.ConfigMaps)
-	vols, volMounts = pod.MountSecrets(vols, volMounts, feSpec.Secrets)
+	vols, volMounts = pod.MountSecrets(feSpec, vols, volMounts, feSpec.Secrets)
+	vols, volMounts = pod.MountWritableTmpDir(feSpec, vols, volMounts)
 	if err := k8sutils.CheckVolumes(vols, volMounts); err != nil {
 		return nil, err
 	}
@@ -77,13 +78,6 @@ func (fc *FeController) buildPodTemplate(src *srapi.StarRocksCluster, config map
 	}
 	if pod.GetStarRocksRootPath(feSpec.FeEnvVars) != pod.GetStarRocksDefaultRootPath() {
 		feContainer.WorkingDir = pod.GetStarRocksRootPath(feSpec.FeEnvVars)
-	}
-
-	if feSpec.ConfigMapInfo.ConfigMapName != "" && feSpec.ConfigMapInfo.ResolveKey != "" {
-		feContainer.Env = append(feContainer.Env, corev1.EnvVar{
-			Name:  _envFeConfigMountPath,
-			Value: _feConfigMountPath,
-		})
 	}
 
 	podSpec := pod.Spec(feSpec, feContainer, vols)

@@ -110,8 +110,12 @@ type StarRocksComponentSpec struct {
 	// Default is false.
 	// Note that:
 	// 	1. This field cannot be set when spec.os.name is windows.
-	//	2. The FE/BE/CN container should support read-only root filesystem. The newest version of FE/BE/CN is 3.3.6,
-	//     and does not support read-only root filesystem
+	//	2. The image has to keep its configuration directory read-only and write its pid file outside of
+	//     the installation. StarRocks images do so since 4.4.0/4.0.10.1; with an older image the
+	//     components fail to start or silently ignore the mounted configuration.
+	//	3. When it is enabled the operator mounts an emptyDir at /tmp and points PID_DIR (and
+	//     UDF_RUNTIME_DIR for BE/CN) at it. Anything else the deployment writes to - the spill
+	//     directory, small files, FE tmp_dir - has to be pointed at a volume in the configuration.
 	// +optional
 	ReadOnlyRootFilesystem *bool `json:"readOnlyRootFilesystem,omitempty" protobuf:"varint,6,opt,name=readOnlyRootFilesystem"`
 
@@ -175,14 +179,32 @@ type ConfigMapReference MountInfo
 
 type SecretReference MountInfo
 
+const (
+	// StarRocksUserID and StarRocksGroupID are the user and the group the StarRocks images create and run
+	// with. The operator sets the group as PodSecurityContext.FSGroup for every component, so that the
+	// mounted Secrets belong to a group the process is a member of, see SecretFileMode.
+	StarRocksUserID  int64 = 1000
+	StarRocksGroupID int64 = 1000
+
+	// SecretFileMode is the permission the files of a mounted Secret get in the container. Kubernetes
+	// defaults to 0644, which makes the credentials a Secret carries - the LDAP bind password, keystore
+	// passwords, a Kerberos keytab, and the StarRocks configuration itself - readable by every user of
+	// the container. The files belong to root and to the group of PodSecurityContext.FSGroup, which the
+	// operator always sets, so 0440 still leaves them readable for the StarRocks process.
+	SecretFileMode int32 = 0o440
+
+	// ExecutableFileMode is used instead of the default when a single file is mounted with a subPath and
+	// the container runs a command of its own: what is mounted is a script and has to stay executable.
+	ExecutableFileMode int32 = 0o755
+)
+
 // MountInfo
 // The reason why we do not support defaultMode is that we use hash.HashObject to
 // calculate the actual volume name. This volume name is used in pod template of statefulset,
 // and if this MountInfo type has been changed, the volume name will be changed too, and
 // that will make pods restart.
-// The default mode is 0644, and in order to support to set permission information for a configMap
-// or secret, we add should specify the subPath and specify a command or args in the container.
-// And It will be set 0755.
+// The permissions of the mounted files are decided by the operator instead, see SecretFileMode and
+// ExecutableFileMode.
 type MountInfo struct {
 	// This must match the Name of a ConfigMap or Secret in the same namespace, and
 	// the length of name must not more than 50 characters.
@@ -208,8 +230,8 @@ func (spec *StarRocksComponentSpec) GetRunAsNonRoot() (*int64, *int64) {
 		return nil, nil
 	}
 
-	var userID int64 = 1000
-	var groupID int64 = 1000
+	userID := StarRocksUserID
+	groupID := StarRocksGroupID
 	return &userID, &groupID
 }
 

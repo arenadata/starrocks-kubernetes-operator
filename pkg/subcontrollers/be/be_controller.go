@@ -219,7 +219,7 @@ func GenerateInternalService(src *srapi.StarRocksCluster,
 func (be *BeController) GetBeConfig(ctx context.Context,
 	beSpec *srapi.StarRocksBeSpec, namespace string) (map[string]interface{}, error) {
 	return k8sutils.GetConfig(ctx, be.Client, beSpec.ConfigMapInfo,
-		beSpec.ConfigMaps, pod.GetConfigDir(beSpec), "be.conf", namespace)
+		beSpec.ConfigMaps, beSpec.Secrets, pod.GetConfigDir(beSpec), "be.conf", namespace)
 }
 
 func (be *BeController) ClearCluster(ctx context.Context, src *srapi.StarRocksCluster) error {

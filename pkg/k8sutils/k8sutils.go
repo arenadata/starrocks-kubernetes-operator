@@ -420,6 +420,19 @@ func GetConfigMap(ctx context.Context, k8scient client.Client, namespace, name s
 	return &configMap, nil
 }
 
+// GetSecret get the secret name=name, namespace=namespace.
+func GetSecret(ctx context.Context, k8scient client.Client, namespace, name string) (*corev1.Secret, error) {
+	logger := logr.FromContextOrDiscard(ctx)
+	logger.Info("fetch secret from kubernetes", "name", name)
+
+	var secret corev1.Secret
+	if err := k8scient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, &secret); err != nil {
+		return nil, err
+	}
+
+	return &secret, nil
+}
+
 var (
 	KUBE_MAJOR_VERSION string
 	KUBE_MINOR_VERSION string
@@ -601,11 +614,13 @@ func CheckVolumes(volumes []corev1.Volume, mounts []corev1.VolumeMount) error {
 
 // GetConfig get the config of component.
 // First, It tries to read the config from the ConfigMapInfo, which has the configMap name and key.
-// Second, if the ConfigMapInfo is empty, it will try to read the config from the ConfigMaps.
-// Last, If the fe ConfigMapInfo is empty and the configMaps is nil, it will return an empty map.
+// Second, if the ConfigMapInfo is empty, it will try to read the config from the Secrets, which is how a
+// configuration holding credentials is expected to be delivered, and then from the ConfigMaps.
+// Last, If none of them mounts the config file, it will return an empty map.
 func GetConfig(ctx context.Context, k8sClient client.Client,
 	configMapInfo srapi.ConfigMapInfo,
-	configMaps []srapi.ConfigMapReference, expectMountPath, expectKey string,
+	configMaps []srapi.ConfigMapReference, secrets []srapi.SecretReference,
+	expectMountPath, expectKey string,
 	namespace string) (map[string]interface{}, error) {
 	if configMapInfo.ConfigMapName != "" || configMapInfo.ResolveKey != "" {
 		if configMapInfo.ConfigMapName == "" || configMapInfo.ResolveKey == "" {
@@ -622,17 +637,44 @@ func GetConfig(ctx context.Context, k8sClient client.Client,
 		res, err := ResolveConfigMap(configMap, configMapInfo.ResolveKey)
 		return res, err
 	}
+
+	mounts := make([]srapi.MountInfo, 0, len(secrets))
+	for i := range secrets {
+		mounts = append(mounts, srapi.MountInfo(secrets[i]))
+	}
+	if name := findMountedName(mounts, expectMountPath, expectKey); name != "" {
+		secret, err := GetSecret(ctx, k8sClient, namespace, name)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return make(map[string]interface{}), nil
+			}
+			return nil, err
+		}
+		return ResolveSecret(secret, expectKey)
+	}
+
 	return getConfigFromConfigMaps(ctx, k8sClient, configMaps, expectMountPath, expectKey, namespace)
 }
 
 func ResolveConfigMap(configMap *corev1.ConfigMap, key string) (map[string]interface{}, error) {
-	res := make(map[string]interface{})
-	data := configMap.Data
-	if _, ok := data[key]; !ok {
-		return res, nil
+	value, ok := configMap.Data[key]
+	if !ok {
+		return make(map[string]interface{}), nil
 	}
-	value := data[key]
+	return resolveConfig(value)
+}
 
+// ResolveSecret parses the config file stored under key in the secret, the same way ResolveConfigMap does
+// it for a ConfigMap.
+func ResolveSecret(secret *corev1.Secret, key string) (map[string]interface{}, error) {
+	value, ok := secret.Data[key]
+	if !ok {
+		return make(map[string]interface{}), nil
+	}
+	return resolveConfig(string(value))
+}
+
+func resolveConfig(value string) (map[string]interface{}, error) {
 	// We use a new viper instance, not the global one, in order to avoid concurrency problems: concurrent map iteration
 	// and map write.
 	// As of viper v1.20 the "properties" codec is no longer bundled, so register the externalized
@@ -649,28 +691,37 @@ func ResolveConfigMap(configMap *corev1.ConfigMap, key string) (map[string]inter
 	return v.AllSettings(), nil
 }
 
-// getConfigFromConfigMaps try to read the config from the configMaps. The strategy is to match
-// the mountPath with expectMountPath.
+// findMountedName returns the name of the ConfigMap or Secret that provides expectKey under
+// expectMountPath. The strategy is to match the mountPath with expectMountPath.
 //   - if subpath is empty, the mount path should equal to expectMountPath. And it will use expectKey as the key.
 //   - if subpath is not empty, it should equal to expectKey, and the mount path should be expectMountPath/expectKey.
-func getConfigFromConfigMaps(ctx context.Context, k8sClient client.Client,
-	configMaps []srapi.ConfigMapReference, expectMountPath, expectKey string,
-	namespace string) (map[string]interface{}, error) {
-	configMapName := ""
-	for i := range configMaps {
-		subPath := configMaps[i].SubPath
+func findMountedName(mounts []srapi.MountInfo, expectMountPath, expectKey string) string {
+	name := ""
+	for i := range mounts {
+		subPath := mounts[i].SubPath
 		if subPath == "" {
-			if configMaps[i].MountPath == expectMountPath {
-				configMapName = configMaps[i].Name
-				// don't break here, we need to use the ConfigMapReference with the subPath first.
+			if mounts[i].MountPath == expectMountPath {
+				name = mounts[i].Name
+				// don't break here, we need to use the reference with the subPath first.
 			}
 		} else {
-			if configMaps[i].MountPath == filepath.Join(expectMountPath, expectKey) && expectKey == subPath {
-				configMapName = configMaps[i].Name
-				break
+			if mounts[i].MountPath == filepath.Join(expectMountPath, expectKey) && expectKey == subPath {
+				return mounts[i].Name
 			}
 		}
 	}
+	return name
+}
+
+// getConfigFromConfigMaps try to read the config from the configMaps, see findMountedName.
+func getConfigFromConfigMaps(ctx context.Context, k8sClient client.Client,
+	configMaps []srapi.ConfigMapReference, expectMountPath, expectKey string,
+	namespace string) (map[string]interface{}, error) {
+	mounts := make([]srapi.MountInfo, 0, len(configMaps))
+	for i := range configMaps {
+		mounts = append(mounts, srapi.MountInfo(configMaps[i]))
+	}
+	configMapName := findMountedName(mounts, expectMountPath, expectKey)
 	if configMapName == "" {
 		return make(map[string]interface{}), nil
 	}

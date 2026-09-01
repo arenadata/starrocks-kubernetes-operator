@@ -168,6 +168,16 @@ func Envs(spec v1.SpecInterface, config map[string]interface{},
 		}
 	}
 
+	if readOnly := spec.IsReadOnlyRootFilesystem(); readOnly != nil && *readOnly {
+		// The installation directory is read-only: the pid file, which FE and BE refuse to start without,
+		// and the runtime directory of the UDFs have to live in the emptyDir MountWritableTmpDir adds.
+		addEnv(corev1.EnvVar{Name: "PID_DIR", Value: WritableTmpDir})
+		switch spec.(type) {
+		case *v1.StarRocksBeSpec, *v1.StarRocksCnSpec:
+			addEnv(corev1.EnvVar{Name: "UDF_RUNTIME_DIR", Value: WritableTmpDir + "/udf-runtime"})
+		}
+	}
+
 	return envs
 }
 
@@ -275,14 +285,19 @@ func Annotations(spec v1.SpecInterface) map[string]string {
 
 func PodSecurityContext(spec v1.SpecInterface) *corev1.PodSecurityContext {
 	_, groupID := spec.GetRunAsNonRoot()
-	fsGroup := (*int64)(nil)
+	// FSGroup is set even when the container runs as root: it makes the mounted Secrets belong to a group
+	// the StarRocks process is a member of, which is what keeps them readable with SecretFileMode (0440).
+	// It is applied to the data volumes as well, so an existing installation goes through a one time
+	// recursive chown of fe/meta and be/storage on the first restart (FSGroupChangePolicy is
+	// OnRootMismatch, so it does not happen again).
+	fsGroup := v1.StarRocksGroupID
 	if groupID != nil {
-		fsGroup = groupID
+		fsGroup = *groupID
 	}
 	onRootMismatch := corev1.FSGroupChangeOnRootMismatch
 	sc := &corev1.PodSecurityContext{
 		FSGroupChangePolicy: &onRootMismatch,
-		FSGroup:             fsGroup,
+		FSGroup:             &fsGroup,
 		Sysctls:             spec.GetSysctls(),
 	}
 	return sc

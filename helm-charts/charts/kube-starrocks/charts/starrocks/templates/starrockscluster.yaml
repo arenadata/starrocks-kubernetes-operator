@@ -220,13 +220,15 @@ spec:
       {{- toYaml .Values.starrocksFESpec.sidecars | nindent 6 }}
       {{- end }}
     {{- end }}
-    {{- if .Values.starrocksFESpec.secrets }}
     secrets:
+    # the configuration is mounted over the conf directory of the installation, the component
+    # reads it from there and the operator reads the ports out of it
+    - name: {{ template "starrockscluster.fe.config.secret.name" . }}
+      mountPath: {{ template "starrockscluster.fe.conf.dir" . }}
     {{- range .Values.starrocksFESpec.secrets }}
     - name: {{ .name }}
       mountPath: {{ .mountPath }}
       subPath: {{ .subPath }}
-    {{- end }}
     {{- end }}
     {{- if or .Values.starrocksFESpec.configMaps .Values.starrocksFESpec.entrypoint }}
     configMaps:
@@ -243,9 +245,6 @@ spec:
         subPath: {{ template "starrockscluster.entrypoint.script.name" .}}
     {{- end }}
     {{- end }}
-    configMapInfo:
-      configMapName: {{ template  "starrockscluster.fe.configmap.name" . }}
-      resolveKey: fe.conf
     {{- if or .Values.starrocksFESpec.storageSpec.name .Values.starrocksFESpec.emptyDirs .Values.starrocksFESpec.hostPaths }}
     storageVolumes:
     {{- if .Values.starrocksFESpec.storageSpec.name }}
@@ -495,13 +494,17 @@ spec:
       {{- toYaml .Values.starrocksBeSpec.sidecars | nindent 6 }}
       {{- end }}
     {{- end }}
-    {{- if .Values.starrocksBeSpec.secrets }}
     secrets:
+    {{- if and .Values.starrocksCluster.enabledBe .Values.starrocksBeSpec.config }}
+    # the configuration is mounted over the conf directory of the installation, the component
+    # reads it from there and the operator reads the ports out of it
+    - name: {{ template "starrockscluster.be.config.secret.name" . }}
+      mountPath: {{ template "starrockscluster.be.conf.dir" . }}
+    {{- end }}
     {{- range .Values.starrocksBeSpec.secrets }}
     - name: {{ .name }}
       mountPath: {{ .mountPath }}
       subPath: {{ .subPath }}
-    {{- end }}
     {{- end }}
     {{- if or .Values.starrocksBeSpec.configMaps .Values.starrocksBeSpec.entrypoint }}
     configMaps:
@@ -518,9 +521,6 @@ spec:
         subPath: {{ template "starrockscluster.entrypoint.script.name" .}}
     {{- end }}
     {{- end }}
-    configMapInfo:
-      configMapName: {{template "starrockscluster.be.configmap.name" . }}
-      resolveKey: be.conf
     {{- if or .Values.starrocksBeSpec.storageSpec.name .Values.starrocksBeSpec.emptyDirs .Values.starrocksBeSpec.hostPaths }}
     storageVolumes:
     {{- if .Values.starrocksBeSpec.storageSpec.name }}
@@ -799,13 +799,17 @@ spec:
     imagePullSecrets:
       {{- include "starrockscluster.cn.imagePullSecrets" . | nindent 6 }}
     {{- end }}
-    {{- if .Values.starrocksCnSpec.secrets }}
     secrets:
+    {{- if and .Values.starrocksCluster.enabledCn .Values.starrocksCnSpec.config }}
+    # the configuration is mounted over the conf directory of the installation, the component
+    # reads it from there and the operator reads the ports out of it
+    - name: {{ template "starrockscluster.cn.config.secret.name" . }}
+      mountPath: {{ template "starrockscluster.cn.conf.dir" . }}
+    {{- end }}
     {{- range .Values.starrocksCnSpec.secrets }}
     - name: {{ .name }}
       mountPath: {{ .mountPath }}
       subPath: {{ .subPath }}
-    {{- end }}
     {{- end }}
     {{- if or .Values.starrocksCnSpec.configMaps .Values.starrocksCnSpec.entrypoint }}
     configMaps:
@@ -822,9 +826,6 @@ spec:
         subPath: {{ template "starrockscluster.entrypoint.script.name" .}}
     {{- end }}
     {{- end }}
-    configMapInfo:
-      configMapName: {{template  "starrockscluster.cn.configmap.name" . }}
-      resolveKey: cn.conf
     {{- if or .Values.starrocksCnSpec.storageSpec.name .Values.starrocksCnSpec.emptyDirs .Values.starrocksCnSpec.hostPaths }}
     storageVolumes:
     {{- if .Values.starrocksCnSpec.storageSpec.name }}
