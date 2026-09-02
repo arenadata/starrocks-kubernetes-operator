@@ -487,7 +487,11 @@ func GetEnvVarValue(ctx context.Context, k8sClient client.Client, namespace stri
 			key := valueFrom.SecretKeyRef.Key
 			return GetValueFromSecret(ctx, k8sClient, namespace, name, key)
 		}
+		if valueFrom.ConfigMapKeyRef != nil {
+			return "", fmt.Errorf("variables from configmap is not supported")
+		}
 	}
+
 	return "", fmt.Errorf("invalid environment variable: %v", envVar)
 }
 

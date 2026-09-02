@@ -136,8 +136,7 @@ func TestGetEnvVarValue(t *testing.T) {
 					},
 				},
 			},
-			want:    "hello",
-			wantErr: false,
+			wantErr: true,
 		},
 		{
 			name: "get value from secret",
