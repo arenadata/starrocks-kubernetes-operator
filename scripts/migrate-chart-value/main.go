@@ -23,10 +23,11 @@ const (
 
 	NAME_OVERRIDE = "nameOverride"
 	TIME_ZONE     = "timeZone"
+	CONFIG_MAPS   = "configMaps"
 )
 
 var _starrocksKeys = []string{NAME_OVERRIDE, "initPassword", TIME_ZONE, "datadog", "starrocksCluster",
-	"starrocksFESpec", "starrocksCnSpec", "starrocksBeSpec", "secrets", "configMaps", "feProxy"}
+	"starrocksFESpec", "starrocksCnSpec", "starrocksBeSpec", "secrets", "feProxy"}
 
 var _operatorKeys = []string{"global", TIME_ZONE, NAME_OVERRIDE, "starrocksOperator"}
 
@@ -115,6 +116,11 @@ func Do(reader io.Reader, targetChartVersion string, writer io.Writer) error {
 		return err
 	}
 
+	if dropConfigMaps(s) {
+		log.Printf("%v is dropped: the chart neither creates nor mounts ConfigMaps any more, "+
+			"move what it listed to secrets\n", CONFIG_MAPS)
+	}
+
 	// find the value of the field "operator" or "starrocks"
 	operator := s[OPERATOR]   // the type of operator is interface{}
 	starrocks := s[STARROCKS] // the type of starrocks is interface{}
@@ -161,6 +167,38 @@ func Do(reader io.Reader, targetChartVersion string, writer io.Writer) error {
 		}
 	}
 	return nil
+}
+
+// dropConfigMaps deletes every configMaps field of a parsed values.yaml, at any level: the top level one
+// that created the ConfigMaps and the ones inside a component spec that mounted them. The chart neither
+// creates nor mounts ConfigMaps any more - everything it delivers is a Secret - so keeping the field would
+// only produce a values.yaml whose mounts helm silently ignores.
+// It reports whether anything was deleted, so that the caller can say so.
+func dropConfigMaps(node interface{}) bool {
+	dropped := false
+	switch value := node.(type) {
+	case map[string]interface{}:
+		if _, ok := value[CONFIG_MAPS]; ok {
+			delete(value, CONFIG_MAPS)
+			dropped = true
+		}
+		for _, child := range value {
+			dropped = dropConfigMaps(child) || dropped
+		}
+	case map[interface{}]interface{}:
+		if _, ok := value[CONFIG_MAPS]; ok {
+			delete(value, CONFIG_MAPS)
+			dropped = true
+		}
+		for _, child := range value {
+			dropped = dropConfigMaps(child) || dropped
+		}
+	case []interface{}:
+		for _, child := range value {
+			dropped = dropConfigMaps(child) || dropped
+		}
+	}
+	return dropped
 }
 
 func Write(w io.Writer, originalFields map[string]interface{}, keys []string, header string) error {

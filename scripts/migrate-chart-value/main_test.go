@@ -93,7 +93,6 @@ starrocksFESpec:
     mysql_service_nio_enabled = true
     sys_log_level = INFO
   secrets: []
-  configMaps: []
 starrocksCnSpec:
   image:
     repository: starrocks/cn-ubuntu
@@ -128,7 +127,6 @@ starrocksCnSpec:
     heartbeat_service_port = 9050
     brpc_port = 8060
   secrets: []
-  configMaps: []
 starrocksBeSpec:
   replicas: 1
   image:
@@ -168,9 +166,7 @@ starrocksBeSpec:
     sys_log_level = INFO
     default_rowset_type = beta
   secrets: []
-  configMaps: []
 secrets: []
-configMaps: []
 `
 const V1_8_0_YAML = `
 operator:
@@ -253,7 +249,6 @@ starrocks:
       mysql_service_nio_enabled = true
       sys_log_level = INFO
     secrets: []
-    configMaps: []
   starrocksCnSpec:
     image:
       repository: starrocks/cn-ubuntu
@@ -288,7 +283,6 @@ starrocks:
       heartbeat_service_port = 9050
       brpc_port = 8060
     secrets: []
-    configMaps: []
   starrocksBeSpec:
     replicas: 1
     image:
@@ -328,9 +322,7 @@ starrocks:
       sys_log_level = INFO
       default_rowset_type = beta
     secrets: []
-    configMaps: []
   secrets: []
-  configMaps: []
 `
 
 var V1_7_1_YAML = func() string {
@@ -353,6 +345,40 @@ func addHeader2(data string, header string) string {
 		panic(err)
 	}
 	return string(output)
+}
+
+// An old values.yaml may still list configMaps, both to create them and to mount them into a component.
+// The chart supports neither any more, so the migration has to drop them instead of producing a
+// values.yaml whose mounts helm silently ignores.
+func TestDoDropsConfigMaps(t *testing.T) {
+	const input = `
+starrocksFESpec:
+  replicas: 1
+  configMaps:
+    - name: my-configmap
+      mountPath: /etc/my-configmap
+  secrets:
+    - name: my-secret
+      mountPath: /etc/my-secret
+configMaps:
+  - name: my-configmap
+    data:
+      key.conf: |
+        content
+secrets: []
+`
+	w := &bytes.Buffer{}
+	if err := Do(strings.NewReader(input), "v1.8.0", w); err != nil {
+		t.Fatalf("Do() error = %v", err)
+	}
+
+	output := w.String()
+	if strings.Contains(output, "configMaps") || strings.Contains(output, "my-configmap") {
+		t.Errorf("Do() kept configMaps in the output:\n%v", output)
+	}
+	if !strings.Contains(output, "my-secret") {
+		t.Errorf("Do() dropped the secrets as well:\n%v", output)
+	}
 }
 
 func TestDo(t *testing.T) {
