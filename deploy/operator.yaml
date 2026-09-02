@@ -10,6 +10,7 @@ kind: ServiceAccount
 metadata:
   name: starrocks
   namespace: starrocks
+
 ---
 # Source: operator/templates/clusterrole.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -80,6 +81,7 @@ rules:
   - get
   - patch
   - update
+
 ---
 # Source: operator/templates/clusterrolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -94,6 +96,7 @@ subjects:
 - kind: ServiceAccount
   name: starrocks
   namespace: starrocks
+
 ---
 # Source: operator/templates/leader-election-role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -148,6 +151,7 @@ subjects:
 - kind: ServiceAccount
   name: starrocks
   namespace: starrocks
+
 ---
 # Source: operator/templates/deployment.yaml
 apiVersion: apps/v1
@@ -178,7 +182,6 @@ spec:
         - --leader-elect
         - --zap-time-encoding=iso8601
         - --zap-encoder=console
-        - --volume-name-with-hash=true
         env:
         - name: TZ
           value: Asia/Shanghai

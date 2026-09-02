@@ -11,8 +11,11 @@ COPY . .
 ARG LDFLAGS="-s -w"
 
 # Build the binary in module mode (vendor/ is no longer used).
-RUN CGO_ENABLED=0 GOOS=linux go build -mod=mod -ldflags="$LDFLAGS" -trimpath -o /app/manager cmd/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -mod=mod -ldflags="$LDFLAGS" -trimpath -o /app/sroperator cmd/main.go
 
 FROM scratch
-COPY --from=build /app/manager /manager
-CMD ["/manager"]
+COPY --from=build /app/sroperator /sroperator
+# scratch has no /etc/passwd, so the UID must be numeric. The deployment manifests all set
+# runAsNonRoot: true, which the kubelet rejects unless the image itself declares a non-root user.
+USER 65532:65532
+CMD ["/sroperator"]
