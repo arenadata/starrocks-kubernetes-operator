@@ -481,12 +481,7 @@ func GetEnvVarValue(ctx context.Context, k8sClient client.Client, namespace stri
 	} else if envVar.ValueFrom != nil {
 		// If ValueFrom is not nil, handle different sources
 		valueFrom := envVar.ValueFrom
-		if valueFrom.ConfigMapKeyRef != nil {
-			// If ConfigMapKeyRef is not nil, get the value from the configmap's key
-			name := valueFrom.ConfigMapKeyRef.Name
-			key := valueFrom.ConfigMapKeyRef.Key
-			return GetValueFromConfigmap(ctx, k8sClient, namespace, name, key)
-		} else if valueFrom.SecretKeyRef != nil {
+		if valueFrom.SecretKeyRef != nil {
 			// If SecretKeyRef is not nil, get the value from the secret's key
 			name := valueFrom.SecretKeyRef.Name
 			key := valueFrom.SecretKeyRef.Key
@@ -494,28 +489,6 @@ func GetEnvVarValue(ctx context.Context, k8sClient client.Client, namespace stri
 		}
 	}
 	return "", fmt.Errorf("invalid environment variable: %v", envVar)
-}
-
-// GetValueFromConfigmap returns the runtime value of a key in a configmap.
-// It assumes that the configmap and the key exist and are valid.
-func GetValueFromConfigmap(ctx context.Context, k8sClient client.Client, namespace string, name string, key string) (string, error) {
-	logger := logr.FromContextOrDiscard(ctx)
-	logger.Info("fetch configmap from kubernetes", "name", name, "configmap-key", key)
-
-	var configMap corev1.ConfigMap
-	err := k8sClient.Get(ctx,
-		types.NamespacedName{
-			Name:      name,
-			Namespace: namespace,
-		}, &configMap)
-	if err != nil {
-		return "", err
-	}
-	value, ok := configMap.Data[key]
-	if !ok {
-		return "", fmt.Errorf("key %s not found in configmap %s", key, name)
-	}
-	return value, nil
 }
 
 // GetValueFromSecret returns the value of a key in a secret.

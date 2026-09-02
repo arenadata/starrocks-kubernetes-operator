@@ -38,53 +38,6 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func Test_getValueFromConfigmap(t *testing.T) {
-	type args struct {
-		k8sClient client.Client
-		namespace string
-		name      string
-		key       string
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    string
-		wantErr bool
-	}{
-		{
-			name: "get value from configmap",
-			args: args{
-				k8sClient: fake.NewFakeClient(srapi.Scheme, &corev1.ConfigMap{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test",
-						Namespace: "default",
-					},
-					Data: map[string]string{
-						"file.txt": "hell world",
-					},
-				}),
-				namespace: "default",
-				name:      "test",
-				key:       "file.txt",
-			},
-			want:    "hell world",
-			wantErr: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := k8sutils.GetValueFromConfigmap(context.Background(), tt.args.k8sClient, tt.args.namespace, tt.args.name, tt.args.key)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GetValueFromConfigmap() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("GetValueFromConfigmap() got = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func Test_getValueFromSecret(t *testing.T) {
 	type args struct {
 		k8sClient client.Client
