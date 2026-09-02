@@ -11,12 +11,11 @@ import (
 	"github.com/StarRocks/starrocks-kubernetes-operator/pkg/k8sutils/templates/pod"
 )
 
-// GetFEConfig get the fe config from configMap.
-// It is not a method of FeController, but BE/CN controller also need to get the config from configMap.
+// GetFEConfig get the fe config from the Secret that is mounted over the conf directory.
+// It is not a method of FeController, but BE/CN controller also need to get the fe config.
 func GetFEConfig(ctx context.Context, client client.Client,
 	feSpec *srapi.StarRocksFeSpec, namespace string) (map[string]interface{}, error) {
-	return k8sutils.GetConfig(ctx, client, feSpec.ConfigMapInfo,
-		feSpec.ConfigMaps, feSpec.Secrets, pod.GetConfigDir(feSpec), "fe.conf",
+	return k8sutils.GetConfig(ctx, client, feSpec.Secrets, pod.GetConfigDir(feSpec), "fe.conf",
 		namespace)
 }
 

@@ -29,7 +29,7 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - configmaps
+  - secrets
   - serviceaccounts
   - services
   verbs:
@@ -39,7 +39,6 @@ rules:
   resources:
   - endpoints
   - pods
-  - secrets
   verbs:
   - get
   - list

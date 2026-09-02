@@ -118,4 +118,30 @@ func TestStarRocksClusterReconciler_FeProxyResourceCreate(t *testing.T) {
 		Name:      "starrockscluster-sample-fe-proxy-service",
 	}, &externalService)
 	require.NoError(t, err)
+
+	// the nginx configuration is delivered by a Secret, mounted read-only over /etc/nginx
+	nginxConf := corev1.Secret{}
+	err = client.Get(context.Background(), types.NamespacedName{
+		Namespace: "default",
+		Name:      "starrockscluster-sample-fe-proxy",
+	}, &nginxConf)
+	require.NoError(t, err)
+	require.Contains(t, string(nginxConf.Data["nginx.conf"]), "listen 8080;")
+
+	podSpec := sts.Spec.Template.Spec
+	var volume *corev1.Volume
+	for i := range podSpec.Volumes {
+		if podSpec.Volumes[i].Secret != nil && podSpec.Volumes[i].Secret.SecretName == nginxConf.Name {
+			volume = &podSpec.Volumes[i]
+		}
+	}
+	require.NotNil(t, volume, "the nginx configuration is mounted from a secret")
+	require.Equal(t, srapi.SecretFileMode, *volume.Secret.DefaultMode)
+
+	// nginx runs as the nginx user, so the pod has to declare its group as the fsGroup: the mounted
+	// configuration belongs to that group and is not readable by anybody else
+	require.NotNil(t, podSpec.SecurityContext)
+	require.NotNil(t, podSpec.SecurityContext.FSGroup)
+	require.Equal(t, srapi.NginxGroupID, *podSpec.SecurityContext.FSGroup)
+	require.Equal(t, srapi.NginxUserID, *podSpec.Containers[0].SecurityContext.RunAsUser)
 }

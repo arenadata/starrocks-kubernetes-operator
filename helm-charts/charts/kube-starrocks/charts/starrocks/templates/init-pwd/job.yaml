@@ -58,12 +58,12 @@ spec:
           name: {{ template "starrockscluster.name" . }}-initpwd-shell
           subPath: fe_initpwd.sh
       volumes:
-      - configMap:
-          defaultMode: 420
+      - secret:
+          defaultMode: 288
           items:
             - key: fe_initpwd.sh
               path: fe_initpwd.sh
-          name: {{ template "starrockscluster.name" . }}-initpwd-shell
+          secretName: {{ template "starrockscluster.name" . }}-initpwd-shell
           optional: false
         name: {{ template "starrockscluster.name" . }}-initpwd-shell
       restartPolicy: OnFailure

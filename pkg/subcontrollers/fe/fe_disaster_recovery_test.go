@@ -8,6 +8,8 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/StarRocks/starrocks-kubernetes-operator/pkg/apis/starrocks/v1"
@@ -273,48 +275,60 @@ func TestRewriteStatefulSetForDisasterRecovery(t *testing.T) {
 }
 
 func Test_hasClusterSnapshotConf(t *testing.T) {
-	type args struct {
-		configMaps []v1.ConfigMapReference
-		secrets    []v1.SecretReference
+	confSecret := func(data map[string][]byte) *corev1.Secret {
+		return &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "fe-conf", Namespace: "default"},
+			Data:       data,
+		}
 	}
+	confDir := "/opt/starrocks/fe/conf"
+
 	tests := []struct {
-		name string
-		args args
-		want bool
+		name    string
+		secrets []v1.SecretReference
+		objects []runtime.Object
+		want    bool
 	}{
 		{
-			name: "has cluster snapshot conf",
-			args: args{
-				configMaps: []v1.ConfigMapReference{
-					{
-						SubPath: "cluster_snapshot.yaml",
-					},
-				},
-			},
-			want: true,
+			name:    "mounted with a subPath of its own",
+			secrets: []v1.SecretReference{{Name: "snapshot", MountPath: confDir + "/cluster_snapshot.yaml", SubPath: "cluster_snapshot.yaml"}},
+			want:    true,
 		},
 		{
-			name: "has cluster snapshot conf",
-			args: args{
-				configMaps: []v1.ConfigMapReference{
-					{
-						MountPath: "fe/conf",
-					},
-				},
-			},
-			want: true,
+			name:    "part of the secret mounted over the conf directory",
+			secrets: []v1.SecretReference{{Name: "fe-conf", MountPath: confDir}},
+			objects: []runtime.Object{confSecret(map[string][]byte{"fe.conf": []byte(""), "cluster_snapshot.yaml": []byte("")})},
+			want:    true,
 		},
 		{
-			name: "no cluster snapshot conf",
-			args: args{
-				configMaps: []v1.ConfigMapReference{},
-			},
+			// the configuration secret is mounted over the conf directory in every deployment, so the
+			// mount path alone must not be taken for a cluster snapshot
+			name:    "conf directory mounted without the snapshot",
+			secrets: []v1.SecretReference{{Name: "fe-conf", MountPath: confDir}},
+			objects: []runtime.Object{confSecret(map[string][]byte{"fe.conf": []byte("")})},
+			want:    false,
+		},
+		{
+			name:    "the secret does not exist",
+			secrets: []v1.SecretReference{{Name: "fe-conf", MountPath: confDir}},
+			want:    false,
+		},
+		{
+			name: "nothing is mounted",
 			want: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := hasClusterSnapshotConf(tt.args.configMaps, tt.args.secrets); got != tt.want {
+			feSpec := &v1.StarRocksFeSpec{
+				StarRocksComponentSpec: v1.StarRocksComponentSpec{Secrets: tt.secrets},
+			}
+			k8sClient := fake.NewFakeClient(scheme.Scheme, tt.objects...)
+			got, err := hasClusterSnapshotConf(context.Background(), k8sClient, "default", feSpec)
+			if err != nil {
+				t.Fatalf("hasClusterSnapshotConf() error = %v", err)
+			}
+			if got != tt.want {
 				t.Errorf("hasClusterSnapshotConf() = %v, want %v", got, tt.want)
 			}
 		})

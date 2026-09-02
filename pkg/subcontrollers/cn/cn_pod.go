@@ -48,12 +48,10 @@ func (cc *CnController) buildPodTemplate(ctx context.Context, object srobject.St
 		vols, volumeMounts = pod.MountEmptyDirVolume(vols, volumeMounts, _logName, pod.GetLogDir(cnSpec), "")
 	}
 
-	// Mount the configuration and the secrets. The configuration is mounted over the conf directory of
-	// the installation: the entrypoint scripts of the image do not copy it anywhere any more, they read
-	// it where it is mounted.
-	vols, volumeMounts = pod.MountConfigMapInfo(vols, volumeMounts, cnSpec.ConfigMapInfo, pod.GetConfigDir(cnSpec))
-	vols, volumeMounts = pod.MountConfigMaps(cnSpec, vols, volumeMounts, cnSpec.ConfigMaps)
-	vols, volumeMounts = pod.MountSecrets(cnSpec, vols, volumeMounts, cnSpec.Secrets)
+	// Mount the Secrets. The configuration is one of them, mounted over the conf directory of the
+	// installation: the entrypoint scripts of the image do not copy it anywhere any more, they read it
+	// where it is mounted.
+	vols, volumeMounts = pod.MountSecrets(vols, volumeMounts, cnSpec.Secrets)
 	vols, volumeMounts = pod.MountWritableTmpDir(cnSpec, vols, volumeMounts)
 	if err := k8sutils.CheckVolumes(vols, volumeMounts); err != nil {
 		return nil, err

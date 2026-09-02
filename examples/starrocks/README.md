@@ -13,4 +13,4 @@ references, and tailor them as necessary to fit the requirement. It primarily co
 
 > Note:
 >
-> Some of the example YAML files need to be edited before using them. For example, the `shared_data mode` example needs editing to specify the shared data (MinIO, AWS, OSS, etc.) location and credentials. When editing these examples you will generally be editing ConfigMaps in the example file.
+> Some of the example YAML files need to be edited before using them. For example, the `shared_data mode` example needs editing to specify the shared data (MinIO, AWS, OSS, etc.) location and credentials. When editing these examples you will generally be editing Secrets in the example file.

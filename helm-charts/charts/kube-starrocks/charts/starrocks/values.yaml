@@ -212,7 +212,7 @@ starrocksFESpec:
   # Specify the entrypoint for FE.
   # By default, the operator will use '/opt/starrocks/fe_entrypoint.sh' as a command and use '$(FE_SERVICE_NAME)' as args in the container spec.
   # If the entrypoint is set, the command will be ["bash", "-c"], and the args will be a filename of the entrypoint script.
-  # A configmap with the name $cluster-fe-entrypoint-script will be created, and the script will be mounted to /etc/starrocks/entrypoint.sh
+  # A secret with the name $cluster-fe-entrypoint-script will be created, and the script will be mounted to /etc/starrocks/entrypoint.sh
   # Pod will be restarted if the entrypoint script is updated.
   entrypoint: {}
     # script: |
@@ -442,13 +442,6 @@ starrocksFESpec:
     # - name: my-secret
     #   mountPath: /etc/my-secret
     #   subPath: ""
-  # mount configmaps if necessary.
-  # see https://kubernetes.io/docs/concepts/storage/volumes/#using-subpath for more details about subPath.
-  configMaps: []
-    # e.g., mount my-configmap to /etc/my-configmap
-    # - name: my-configmap
-    #   mountPath: /etc/my-configmap
-    #   subPath: ""
   # terminationGracePeriodSeconds defines duration in seconds the FE pod needs to terminate gracefully.
   # the default value is 120 seconds
   terminationGracePeriodSeconds: 120
@@ -553,7 +546,7 @@ starrocksCnSpec:
   # Specify the entrypoint for CN.
   # By default, the operator will use '/opt/starrocks/cn_entrypoint.sh' as command, and use '$(FE_SERVICE_NAME)' as args in container spec.
   # If the entrypoint is set, the command will be ["bash", "-c"], and the args will be a filename of the entrypoint script.
-  # A configmap with the name $cluster-cn-entrypoint-script will be created, and the script will be mounted to /etc/starrocks/entrypoint.sh
+  # A secret with the name $cluster-cn-entrypoint-script will be created, and the script will be mounted to /etc/starrocks/entrypoint.sh
   # Pod will be restarted if the entrypoint script is updated.
   entrypoint: {}
     # script: |
@@ -822,13 +815,6 @@ starrocksCnSpec:
     # - name: my-secret
     #   mountPath: /etc/my-secret
     #   subPath: ""
-  # mount configmaps if necessary.
-  # see https://kubernetes.io/docs/concepts/storage/volumes/#using-subpath for more details about subPath.
-  configMaps: []
-    # e.g., mount my-configmap to /etc/my-configmap
-    # - name: my-configmap
-    #   mountPath: /etc/my-configmap
-    #   subPath: ""
   # terminationGracePeriodSeconds defines duration in seconds the CN pod needs to terminate gracefully.
   # the default value is 120 seconds
   terminationGracePeriodSeconds: 120
@@ -932,7 +918,7 @@ starrocksBeSpec:
   # Specify the entrypoint for BE.
   # By default, the operator will use '/opt/starrocks/be_entrypoint.sh' as command, and use '$(FE_SERVICE_NAME)' as args in the container spec.
   # If the entrypoint is set, the command will be ["bash", "-c"], and the args will be a filename of the entrypoint script.
-  # A configmap with the name $cluster-be-entrypoint-script will be created, and the script will be mounted to /etc/starrocks/entrypoint.sh
+  # A secret with the name $cluster-be-entrypoint-script will be created, and the script will be mounted to /etc/starrocks/entrypoint.sh
   # Pod will be restarted if the entrypoint script is updated.
   entrypoint: {}
     # script: |
@@ -1168,13 +1154,6 @@ starrocksBeSpec:
     # - name: my-secret
     #   mountPath: /etc/my-secret
     #   subPath: ""
-  # mount configmaps if necessary.
-  # see https://kubernetes.io/docs/concepts/storage/volumes/#using-subpath for more details about subPath.
-  configMaps: []
-    # e.g., mount my-configmap to /etc/my-configmap
-    # - name: my-configmap
-    #   mountPath: /etc/my-configmap
-    #   subPath: ""
   # terminationGracePeriodSeconds defines duration in seconds the BE pod needs to terminate gracefully.
   # the default value is 120 seconds
   terminationGracePeriodSeconds: 120
@@ -1270,15 +1249,6 @@ secrets: []
   #   data:
   #     key: |
   #       this is the content of the secret
-  #       when mounted, the key will be the name of the file
-
-# create configmaps if necessary.
-configMaps: []
-  # e.g., create my-configmap
-  # - name: my-configmap
-  #   data:
-  #     key: |
-  #       this is the content of the configmap
   #       when mounted, the key will be the name of the file
 
 # If you need to deploy other resources, e.g., serviceAccount, you can add them here.

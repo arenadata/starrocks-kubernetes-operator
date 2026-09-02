@@ -409,59 +409,25 @@ func TestGetFeConfig(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "get FE config from fe ConfigMapInfo",
+			name: "get FE config from a secret, with matching subpath",
 			args: args{
 				ctx: context.Background(),
-				k8sClient: fake.NewFakeClient(srapi.Scheme, &corev1.ConfigMap{
+				k8sClient: fake.NewFakeClient(srapi.Scheme, &corev1.Secret{
 					TypeMeta: metav1.TypeMeta{
-						Kind:       "ConfigMap",
+						Kind:       "Secret",
 						APIVersion: corev1.SchemeGroupVersion.String(),
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "fe-configMap",
 						Namespace: "default",
 					},
-					Data: map[string]string{
-						"fe.conf": "aa = bb",
+					Data: map[string][]byte{
+						"fe.conf": []byte("cc = dd"),
 					},
 				}),
 				feSpec: srapi.StarRocksFeSpec{
 					StarRocksComponentSpec: srapi.StarRocksComponentSpec{
-						StarRocksLoadSpec: srapi.StarRocksLoadSpec{
-							ConfigMapInfo: srapi.ConfigMapInfo{
-								ConfigMapName: "fe-configMap",
-								ResolveKey:    "fe.conf",
-							},
-						},
-						ConfigMaps: nil,
-					},
-				},
-				namespace: "default",
-			},
-			want: map[string]interface{}{
-				"aa": "bb",
-			},
-		},
-		{
-			name: "get FE config from configMaps, with matching subpath",
-			args: args{
-				ctx: context.Background(),
-				k8sClient: fake.NewFakeClient(srapi.Scheme, &corev1.ConfigMap{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       "ConfigMap",
-						APIVersion: corev1.SchemeGroupVersion.String(),
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "fe-configMap",
-						Namespace: "default",
-					},
-					Data: map[string]string{
-						"fe.conf": "cc = dd",
-					},
-				}),
-				feSpec: srapi.StarRocksFeSpec{
-					StarRocksComponentSpec: srapi.StarRocksComponentSpec{
-						ConfigMaps: []srapi.ConfigMapReference{
+						Secrets: []srapi.SecretReference{
 							{
 								Name:      "fe-configMap",
 								MountPath: "/opt/starrocks/fe/conf/fe.conf",
@@ -477,25 +443,25 @@ func TestGetFeConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "get FE config from configMap 1, without subpath",
+			name: "get FE config from a secret, without subpath",
 			args: args{
 				ctx: context.Background(),
-				k8sClient: fake.NewFakeClient(srapi.Scheme, &corev1.ConfigMap{
+				k8sClient: fake.NewFakeClient(srapi.Scheme, &corev1.Secret{
 					TypeMeta: metav1.TypeMeta{
-						Kind:       "ConfigMap",
+						Kind:       "Secret",
 						APIVersion: corev1.SchemeGroupVersion.String(),
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "fe-configMap",
 						Namespace: "default",
 					},
-					Data: map[string]string{
-						"fe.conf": "cc = dd",
+					Data: map[string][]byte{
+						"fe.conf": []byte("cc = dd"),
 					},
 				}),
 				feSpec: srapi.StarRocksFeSpec{
 					StarRocksComponentSpec: srapi.StarRocksComponentSpec{
-						ConfigMaps: []srapi.ConfigMapReference{
+						Secrets: []srapi.SecretReference{
 							{
 								Name:      "fe-configMap",
 								MountPath: "/opt/starrocks/fe/conf",

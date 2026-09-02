@@ -8,22 +8,8 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - configmaps
-  - services
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
   - endpoints
   - pods
-  - secrets
   - serviceaccounts
   verbs:
   - get
@@ -36,6 +22,19 @@ rules:
   verbs:
   - create
   - patch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - apps
   resources:

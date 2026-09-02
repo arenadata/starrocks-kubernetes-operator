@@ -57,11 +57,7 @@ type StarRocksComponentSpec struct {
 	// +optional
 	Capabilities *corev1.Capabilities `json:"capabilities,omitempty"`
 
-	// the reference for configMap which allow users to mount any files to container.
-	// +optional
-	ConfigMaps []ConfigMapReference `json:"configMaps,omitempty"`
-
-	// the reference for secrets.
+	// the reference for secrets, which allow users to mount any files to container.
 	// +optional
 	Secrets []SecretReference `json:"secrets,omitempty"`
 
@@ -186,16 +182,6 @@ type StarRocksComponentStatus struct {
 	Reason string `json:"reason,omitempty"`
 }
 
-type ConfigMapInfo struct {
-	// the config info for start progress.
-	ConfigMapName string `json:"configMapName,omitempty"`
-
-	// the config response key in configmap.
-	ResolveKey string `json:"resolveKey,omitempty"`
-}
-
-type ConfigMapReference MountInfo
-
 type SecretReference MountInfo
 
 const (
@@ -205,16 +191,18 @@ const (
 	StarRocksUserID  int64 = 1000
 	StarRocksGroupID int64 = 1000
 
+	// NginxUserID and NginxGroupID are the user and the group the nginx image of the FE proxy runs with.
+	// The operator sets the group as PodSecurityContext.FSGroup of the FE proxy, so that nginx can read
+	// its configuration Secret, which is mounted with SecretFileMode.
+	NginxUserID  int64 = 101
+	NginxGroupID int64 = 101
+
 	// SecretFileMode is the permission the files of a mounted Secret get in the container. Kubernetes
 	// defaults to 0644, which makes the credentials a Secret carries - the LDAP bind password, keystore
 	// passwords, a Kerberos keytab, and the StarRocks configuration itself - readable by every user of
 	// the container. The files belong to root and to the group of PodSecurityContext.FSGroup, which the
 	// operator always sets, so 0440 still leaves them readable for the StarRocks process.
 	SecretFileMode int32 = 0o440
-
-	// ExecutableFileMode is used instead of the default when a single file is mounted with a subPath and
-	// the container runs a command of its own: what is mounted is a script and has to stay executable.
-	ExecutableFileMode int32 = 0o755
 )
 
 // MountInfo
@@ -222,10 +210,9 @@ const (
 // calculate the actual volume name. This volume name is used in pod template of statefulset,
 // and if this MountInfo type has been changed, the volume name will be changed too, and
 // that will make pods restart.
-// The permissions of the mounted files are decided by the operator instead, see SecretFileMode and
-// ExecutableFileMode.
+// The permissions of the mounted files are decided by the operator instead, see SecretFileMode.
 type MountInfo struct {
-	// This must match the Name of a ConfigMap or Secret in the same namespace, and
+	// This must match the Name of a Secret in the same namespace, and
 	// the length of name must not more than 50 characters.
 	Name string `json:"name,omitempty"`
 

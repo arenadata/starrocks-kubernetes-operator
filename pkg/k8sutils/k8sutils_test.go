@@ -408,11 +408,11 @@ func TestApplyDeployment(t *testing.T) {
 	}
 }
 
-func TestApplyConfigMap(t *testing.T) {
+func TestApplySecret(t *testing.T) {
 	type args struct {
 		ctx       context.Context
 		k8sClient client.Client
-		configmap *corev1.ConfigMap
+		secret    *corev1.Secret
 	}
 	tests := []struct {
 		name    string
@@ -420,17 +420,17 @@ func TestApplyConfigMap(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "test apply configmap which not exist",
+			name: "test apply secret which not exist",
 			args: args{
 				ctx:       context.Background(),
 				k8sClient: fake.NewFakeClient(srapi.Scheme),
-				configmap: &corev1.ConfigMap{
+				secret: &corev1.Secret{
 					TypeMeta: metav1.TypeMeta{
-						Kind:       "ConfigMap",
+						Kind:       "Secret",
 						APIVersion: corev1.SchemeGroupVersion.String(),
 					},
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "my-configmap",
+						Name:      "my-secret",
 						Namespace: "default",
 						Annotations: map[string]string{
 							"test": "test",
@@ -440,34 +440,34 @@ func TestApplyConfigMap(t *testing.T) {
 			},
 		},
 		{
-			name: "test apply configmap which has been created",
+			name: "test apply secret which has been created",
 			args: args{
 				ctx: context.Background(),
-				k8sClient: fake.NewFakeClient(srapi.Scheme, &corev1.ConfigMap{
+				k8sClient: fake.NewFakeClient(srapi.Scheme, &corev1.Secret{
 					TypeMeta: metav1.TypeMeta{
-						Kind:       "ConfigMap",
+						Kind:       "Secret",
 						APIVersion: corev1.SchemeGroupVersion.String(),
 					},
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "my-configmap",
+						Name:      "my-secret",
 						Namespace: "default",
 					},
 				}),
-				configmap: &corev1.ConfigMap{
+				secret: &corev1.Secret{
 					TypeMeta: metav1.TypeMeta{
-						Kind:       "ConfigMap",
+						Kind:       "Secret",
 						APIVersion: corev1.SchemeGroupVersion.String(),
 					},
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "my-configmap",
+						Name:      "my-secret",
 						Namespace: "default",
 						Annotations: map[string]string{
 							"test": "test",
 						},
 					},
-					// add Data to make sure the hash value will be changed
-					Data: map[string]string{
-						"key": "value",
+					// add Data to make sure the content differs from the created one
+					Data: map[string][]byte{
+						"key": []byte("value"),
 					},
 				},
 			},
@@ -475,25 +475,25 @@ func TestApplyConfigMap(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := k8sutils.ApplyConfigMap(tt.args.ctx, tt.args.k8sClient, tt.args.configmap); (err != nil) != tt.wantErr {
-				t.Errorf("ApplyConfigMap() error = %v, wantErr %v", err, tt.wantErr)
+			if err := k8sutils.ApplySecret(tt.args.ctx, tt.args.k8sClient, tt.args.secret); (err != nil) != tt.wantErr {
+				t.Errorf("ApplySecret() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
-			configMap := &corev1.ConfigMap{}
+			secret := &corev1.Secret{}
 			if err := tt.args.k8sClient.Get(context.Background(), types.NamespacedName{
-				Name:      tt.args.configmap.Name,
-				Namespace: tt.args.configmap.Namespace},
-				configMap,
+				Name:      tt.args.secret.Name,
+				Namespace: tt.args.secret.Namespace},
+				secret,
 			); err != nil {
-				t.Errorf("Get ConfigMap error = %v", err)
+				t.Errorf("Get Secret error = %v", err)
 			}
-			if configMap.Annotations["test"] != "test" {
+			if secret.Annotations["test"] != "test" {
 				t.Errorf("Object does not have test annotation")
 			}
 
-			if err := k8sutils.DeleteConfigMap(context.Background(),
-				tt.args.k8sClient, tt.args.configmap.Namespace, tt.args.configmap.Name); err != nil {
-				t.Errorf("Delete Configmap error = %v", err)
+			if err := k8sutils.DeleteSecret(context.Background(),
+				tt.args.k8sClient, tt.args.secret.Namespace, tt.args.secret.Name); err != nil {
+				t.Errorf("Delete Secret error = %v", err)
 			}
 		})
 	}
@@ -893,19 +893,6 @@ func TestHasVolume(t *testing.T) {
 	}
 }
 
-func TestResolveConfigMap(t *testing.T) {
-	configMap := corev1.ConfigMap{
-		Data: map[string]string{
-			"fe.conf": "http_port = 8030",
-		},
-	}
-	res, err := k8sutils.ResolveConfigMap(&configMap, "fe.conf")
-	require.NoError(t, err)
-
-	_, ok := res["http_port"]
-	require.Equal(t, true, ok)
-}
-
 func TestResolveSecret(t *testing.T) {
 	secret := corev1.Secret{
 		Data: map[string][]byte{
@@ -933,19 +920,13 @@ func TestGetConfigFromSecret(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "fe-conf", Namespace: "default"},
 				Data:       map[string][]byte{"fe.conf": []byte("http_port = 18030")},
 			},
-			&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{Name: "fe-cm", Namespace: "default"},
-				Data:       map[string]string{"fe.conf": "http_port = 28030"},
-			},
 		)
 	}
 
 	tests := []struct {
-		name          string
-		configMapInfo srapi.ConfigMapInfo
-		configMaps    []srapi.ConfigMapReference
-		secrets       []srapi.SecretReference
-		wantHTTPPort  int32
+		name         string
+		secrets      []srapi.SecretReference
+		wantHTTPPort int32
 	}{
 		{
 			name:         "secret mounted over the conf directory",
@@ -967,23 +948,12 @@ func TestGetConfigFromSecret(t *testing.T) {
 			secrets:      []srapi.SecretReference{{Name: "missing", MountPath: confDir}},
 			wantHTTPPort: rutils.GetPort(nil, rutils.HTTP_PORT),
 		},
-		{
-			name:         "a configmap mounted over the conf directory still works",
-			configMaps:   []srapi.ConfigMapReference{{Name: "fe-cm", MountPath: confDir}},
-			wantHTTPPort: 28030,
-		},
-		{
-			name:          "the legacy configMapInfo wins",
-			configMapInfo: srapi.ConfigMapInfo{ConfigMapName: "fe-cm", ResolveKey: "fe.conf"},
-			secrets:       []srapi.SecretReference{{Name: "fe-conf", MountPath: confDir}},
-			wantHTTPPort:  28030,
-		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			res, err := k8sutils.GetConfig(context.Background(), newClient(), tt.configMapInfo,
-				tt.configMaps, tt.secrets, confDir, "fe.conf", "default")
+			res, err := k8sutils.GetConfig(context.Background(), newClient(), tt.secrets,
+				confDir, "fe.conf", "default")
 			require.NoError(t, err)
 			require.Equal(t, tt.wantHTTPPort, rutils.GetPort(res, rutils.HTTP_PORT))
 		})

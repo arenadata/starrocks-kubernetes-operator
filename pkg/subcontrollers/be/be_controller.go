@@ -105,10 +105,10 @@ func (be *BeController) SyncCluster(ctx context.Context, src *srapi.StarRocksClu
 		return nil
 	}
 
-	logger.V(log.DebugLevel).Info("get be/fe config to resolve ports", "ConfigMapInfo", beSpec.ConfigMapInfo)
+	logger.V(log.DebugLevel).Info("get be/fe config to resolve ports", "secrets", beSpec.Secrets)
 	beConfig, err := be.GetBeConfig(ctx, beSpec, src.Namespace)
 	if err != nil {
-		logger.Error(err, "get be config failed", "ConfigMapInfo", beSpec.ConfigMapInfo)
+		logger.Error(err, "get be config failed", "secrets", beSpec.Secrets)
 		return err
 	}
 
@@ -215,11 +215,10 @@ func GenerateInternalService(src *srapi.StarRocksCluster,
 	return searchSvc
 }
 
-// GetBeConfig get the config of BE from configmap.
+// GetBeConfig get the config of BE from the Secret that is mounted over the conf directory.
 func (be *BeController) GetBeConfig(ctx context.Context,
 	beSpec *srapi.StarRocksBeSpec, namespace string) (map[string]interface{}, error) {
-	return k8sutils.GetConfig(ctx, be.Client, beSpec.ConfigMapInfo,
-		beSpec.ConfigMaps, beSpec.Secrets, pod.GetConfigDir(beSpec), "be.conf", namespace)
+	return k8sutils.GetConfig(ctx, be.Client, beSpec.Secrets, pod.GetConfigDir(beSpec), "be.conf", namespace)
 }
 
 func (be *BeController) ClearCluster(ctx context.Context, src *srapi.StarRocksCluster) error {

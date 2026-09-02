@@ -214,15 +214,15 @@ be.conf: |
 {{- print "/etc/starrocks" }}
 {{- end }}
 
-{{- define "starrockscluster.fe.entrypoint.script.configmap.name" -}}
+{{- define "starrockscluster.fe.entrypoint.script.secret.name" -}}
 {{- print (include "starrockscluster.name" .) "-fe-entrypoint-script" }}
 {{- end }}
 
-{{- define "starrockscluster.be.entrypoint.script.configmap.name" -}}
+{{- define "starrockscluster.be.entrypoint.script.secret.name" -}}
 {{- print (include "starrockscluster.name" .) "-be-entrypoint-script" }}
 {{- end }}
 
-{{- define "starrockscluster.cn.entrypoint.script.configmap.name" -}}
+{{- define "starrockscluster.cn.entrypoint.script.secret.name" -}}
 {{- print (include "starrockscluster.name" .) "-cn-entrypoint-script" }}
 {{- end }}
 

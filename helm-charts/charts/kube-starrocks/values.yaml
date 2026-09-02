@@ -108,7 +108,7 @@ operator:
     # By default, Operator will use cluster.local as the dnsDomainSuffix.
     # If you set up a kubernetes cluster with a different dnsDomainSuffix, you need to set this value.
     dnsDomainSuffix: ""
-    # By default, the volume name of secret and configmap created by operator for the FE/BE/CN pods has a hash suffix.
+    # By default, the volume name of the secrets created by operator for the FE/BE/CN pods has a hash suffix.
     # If users plan to use a sidecar or init container to mount the same volume, it will be challenging to get the volume name.
     # In this situation, you can set this value to false.
     volumeNameWithHash: true
@@ -328,7 +328,7 @@ starrocks:
     # Specify the entrypoint for FE.
     # By default, the operator will use '/opt/starrocks/fe_entrypoint.sh' as a command and use '$(FE_SERVICE_NAME)' as args in the container spec.
     # If the entrypoint is set, the command will be ["bash", "-c"], and the args will be a filename of the entrypoint script.
-    # A configmap with the name $cluster-fe-entrypoint-script will be created, and the script will be mounted to /etc/starrocks/entrypoint.sh
+    # A secret with the name $cluster-fe-entrypoint-script will be created, and the script will be mounted to /etc/starrocks/entrypoint.sh
     # Pod will be restarted if the entrypoint script is updated.
     entrypoint: {}
       # script: |
@@ -558,13 +558,6 @@ starrocks:
       # - name: my-secret
       #   mountPath: /etc/my-secret
       #   subPath: ""
-    # mount configmaps if necessary.
-    # see https://kubernetes.io/docs/concepts/storage/volumes/#using-subpath for more details about subPath.
-    configMaps: []
-      # e.g., mount my-configmap to /etc/my-configmap
-      # - name: my-configmap
-      #   mountPath: /etc/my-configmap
-      #   subPath: ""
     # terminationGracePeriodSeconds defines duration in seconds the FE pod needs to terminate gracefully.
     # the default value is 120 seconds
     terminationGracePeriodSeconds: 120
@@ -669,7 +662,7 @@ starrocks:
     # Specify the entrypoint for CN.
     # By default, the operator will use '/opt/starrocks/cn_entrypoint.sh' as command, and use '$(FE_SERVICE_NAME)' as args in container spec.
     # If the entrypoint is set, the command will be ["bash", "-c"], and the args will be a filename of the entrypoint script.
-    # A configmap with the name $cluster-cn-entrypoint-script will be created, and the script will be mounted to /etc/starrocks/entrypoint.sh
+    # A secret with the name $cluster-cn-entrypoint-script will be created, and the script will be mounted to /etc/starrocks/entrypoint.sh
     # Pod will be restarted if the entrypoint script is updated.
     entrypoint: {}
       # script: |
@@ -938,13 +931,6 @@ starrocks:
       # - name: my-secret
       #   mountPath: /etc/my-secret
       #   subPath: ""
-    # mount configmaps if necessary.
-    # see https://kubernetes.io/docs/concepts/storage/volumes/#using-subpath for more details about subPath.
-    configMaps: []
-      # e.g., mount my-configmap to /etc/my-configmap
-      # - name: my-configmap
-      #   mountPath: /etc/my-configmap
-      #   subPath: ""
     # terminationGracePeriodSeconds defines duration in seconds the CN pod needs to terminate gracefully.
     # the default value is 120 seconds
     terminationGracePeriodSeconds: 120
@@ -1048,7 +1034,7 @@ starrocks:
     # Specify the entrypoint for BE.
     # By default, the operator will use '/opt/starrocks/be_entrypoint.sh' as command, and use '$(FE_SERVICE_NAME)' as args in the container spec.
     # If the entrypoint is set, the command will be ["bash", "-c"], and the args will be a filename of the entrypoint script.
-    # A configmap with the name $cluster-be-entrypoint-script will be created, and the script will be mounted to /etc/starrocks/entrypoint.sh
+    # A secret with the name $cluster-be-entrypoint-script will be created, and the script will be mounted to /etc/starrocks/entrypoint.sh
     # Pod will be restarted if the entrypoint script is updated.
     entrypoint: {}
       # script: |
@@ -1284,13 +1270,6 @@ starrocks:
       # - name: my-secret
       #   mountPath: /etc/my-secret
       #   subPath: ""
-    # mount configmaps if necessary.
-    # see https://kubernetes.io/docs/concepts/storage/volumes/#using-subpath for more details about subPath.
-    configMaps: []
-      # e.g., mount my-configmap to /etc/my-configmap
-      # - name: my-configmap
-      #   mountPath: /etc/my-configmap
-      #   subPath: ""
     # terminationGracePeriodSeconds defines duration in seconds the BE pod needs to terminate gracefully.
     # the default value is 120 seconds
     terminationGracePeriodSeconds: 120
@@ -1387,16 +1366,7 @@ starrocks:
     #     key: |
     #       this is the content of the secret
     #       when mounted, the key will be the name of the file
-  
-  # create configmaps if necessary.
-  configMaps: []
-    # e.g., create my-configmap
-    # - name: my-configmap
-    #   data:
-    #     key: |
-    #       this is the content of the configmap
-    #       when mounted, the key will be the name of the file
-  
+    
   # If you need to deploy other resources, e.g., serviceAccount, you can add them here.
   # You can even deploy resources to different namespaces
   resources: []

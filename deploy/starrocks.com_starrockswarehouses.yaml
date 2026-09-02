@@ -869,24 +869,6 @@ spec:
                     items:
                       type: string
                     type: array
-                  configMapInfo:
-                    properties:
-                      configMapName:
-                        type: string
-                      resolveKey:
-                        type: string
-                    type: object
-                  configMaps:
-                    items:
-                      properties:
-                        mountPath:
-                          type: string
-                        name:
-                          type: string
-                        subPath:
-                          type: string
-                      type: object
-                    type: array
                   envVars:
                     items:
                       properties:

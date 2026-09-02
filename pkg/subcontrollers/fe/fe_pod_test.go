@@ -90,23 +90,6 @@ func TestBuildPodTemplateMountsTheConfigurationOverConfDir(t *testing.T) {
 			"a secret holds credentials and must not be world readable")
 		require.False(t, hasEnv(template.Spec.Containers[0].Env, "CONFIGMAP_MOUNT_PATH"))
 	})
-
-	t.Run("from a configmap", func(t *testing.T) {
-		src := clusterWithFeSpec(&srapi.StarRocksFeSpec{
-			StarRocksComponentSpec: srapi.StarRocksComponentSpec{
-				StarRocksLoadSpec: srapi.StarRocksLoadSpec{
-					ConfigMapInfo: srapi.ConfigMapInfo{ConfigMapName: "fe-cm", ResolveKey: "fe.conf"},
-				},
-			},
-		})
-
-		template, err := (&FeController{}).buildPodTemplate(src, nil)
-		require.NoError(t, err)
-
-		mount := volumeMountOf(template.Spec.Containers[0].VolumeMounts, feConfDir)
-		require.NotNil(t, mount, "the legacy configMapInfo is mounted over %s too", feConfDir)
-		require.False(t, hasEnv(template.Spec.Containers[0].Env, "CONFIGMAP_MOUNT_PATH"))
-	})
 }
 
 func TestBuildPodTemplateForReadOnlyRootFilesystem(t *testing.T) {

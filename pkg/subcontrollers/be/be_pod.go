@@ -51,12 +51,10 @@ func (be *BeController) buildPodTemplate(src *srapi.StarRocksCluster, config map
 		vols, volumeMounts = pod.MountEmptyDirVolume(vols, volumeMounts, _logName, pod.GetLogDir(beSpec), "")
 	}
 
-	// Mount the configuration and the secrets. The configuration is mounted over the conf directory of
-	// the installation: the entrypoint scripts of the image do not copy it anywhere any more, they read
-	// it where it is mounted.
-	vols, volumeMounts = pod.MountConfigMapInfo(vols, volumeMounts, beSpec.ConfigMapInfo, pod.GetConfigDir(beSpec))
-	vols, volumeMounts = pod.MountConfigMaps(beSpec, vols, volumeMounts, beSpec.ConfigMaps)
-	vols, volumeMounts = pod.MountSecrets(beSpec, vols, volumeMounts, beSpec.Secrets)
+	// Mount the Secrets. The configuration is one of them, mounted over the conf directory of the
+	// installation: the entrypoint scripts of the image do not copy it anywhere any more, they read it
+	// where it is mounted.
+	vols, volumeMounts = pod.MountSecrets(vols, volumeMounts, beSpec.Secrets)
 	vols, volumeMounts = pod.MountWritableTmpDir(beSpec, vols, volumeMounts)
 	if err := k8sutils.CheckVolumes(vols, volumeMounts); err != nil {
 		return nil, err

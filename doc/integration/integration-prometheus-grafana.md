@@ -108,9 +108,9 @@ metadata:
   namespace: default
 spec:
   starRocksBeSpec:
-    configMapInfo:
-      configMapName: kube-starrocks-be-cm
-      resolveKey: be.conf
+    secrets:
+      - name: kube-starrocks-be-conf
+        mountPath: /opt/starrocks/be/conf
     image: starrocks/be-ubuntu:4.1-latest
     limits:
       cpu: 4
@@ -125,9 +125,9 @@ spec:
         prometheus.io/port: "8040"
         prometheus.io/scrape: "true"
   starRocksFeSpec:
-    configMapInfo:
-      configMapName: kube-starrocks-fe-cm
-      resolveKey: fe.conf
+    secrets:
+      - name: kube-starrocks-fe-conf
+        mountPath: /opt/starrocks/fe/conf
     image: starrocks/fe-ubuntu:4.1-latest
     limits:
       cpu: 4

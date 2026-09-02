@@ -20,9 +20,9 @@ spec:
     requests:
       cpu: 8
       memory: 16Gi
-    configMapInfo:
-      configMapName: starrockscluster-sample-fe-cm
-      resolveKey: fe.conf
+    secrets:
+      - name: starrockscluster-sample-fe-conf
+        mountPath: /opt/starrocks/fe/conf
   starRocksBeSpec:
     image: starrocks/be-ubuntu:latest
     replicas: 3
@@ -32,9 +32,9 @@ spec:
     requests:
       cpu: 16
       memory: 64Gi
-    configMapInfo:
-      configMapName: starrockscluster-sample-be-cm
-      resolveKey: be.conf
+    secrets:
+      - name: starrockscluster-sample-be-conf
+        mountPath: /opt/starrocks/be/conf
   starRocksCnSpec:
     image: starrocks/cn-ubuntu:latest
     replicas: 1
@@ -44,20 +44,21 @@ spec:
     requests:
       cpu: 16
       memory: 64Gi
-    configMapInfo:
-      configMapName: starrockscluster-sample-cn-cm
-      resolveKey: cn.conf
+    secrets:
+      - name: starrockscluster-sample-cn-conf
+        mountPath: /opt/starrocks/cn/conf
 
 ---
 
 # fe config
 apiVersion: v1
-kind: ConfigMap
+kind: Secret
 metadata:
-  name: starrockscluster-sample-fe-cm
+  name: starrockscluster-sample-fe-conf
   labels:
     cluster: starrockscluster-sample
-data:
+type: Opaque
+stringData:
   fe.conf: |
     LOG_DIR = ${STARROCKS_HOME}/log
     DATE = "$(date +%Y%m%d-%H%M%S)"
@@ -73,12 +74,13 @@ data:
 
 # be config
 apiVersion: v1
-kind: ConfigMap
+kind: Secret
 metadata:
-  name: starrockscluster-sample-be-cm
+  name: starrockscluster-sample-be-conf
   labels:
     cluster: starrockscluster-sample
-data:
+type: Opaque
+stringData:
   be.conf: |
     be_port = 9060
     webserver_port = 8040
@@ -91,12 +93,13 @@ data:
 
 # cn config
 apiVersion: v1
-kind: ConfigMap
+kind: Secret
 metadata:
-  name: starrockscluster-sample-cn-cm
+  name: starrockscluster-sample-cn-conf
   labels:
     cluster: starrockscluster-sample
-data:
+type: Opaque
+stringData:
   cn.conf: |
     sys_log_level = INFO
     # ports for admin, web, heartbeat service

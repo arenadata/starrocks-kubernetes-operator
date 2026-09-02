@@ -16,7 +16,9 @@ import (
 	"github.com/StarRocks/starrocks-kubernetes-operator/pkg/subcontrollers/fe"
 )
 
-func (controller *FeProxyController) SyncConfigMap(ctx context.Context, src *srapi.StarRocksCluster) error {
+// SyncSecret renders the nginx configuration of the FE proxy into a Secret. It is a Secret and not a
+// ConfigMap because that is the only kind of volume the operator mounts, see MountSecrets.
+func (controller *FeProxyController) SyncSecret(ctx context.Context, src *srapi.StarRocksCluster) error {
 	feProxySpec := src.Spec.StarRocksFeProxySpec
 
 	feSpec := src.Spec.StarRocksFeSpec
@@ -37,15 +39,16 @@ func (controller *FeProxyController) SyncConfigMap(ctx context.Context, src *sra
 	}
 
 	or := metav1.NewControllerRef(src, src.GroupVersionKind())
-	configmap := corev1.ConfigMap{
+	secret := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            load.Name(src.Name, feProxySpec),
 			Namespace:       src.Namespace,
 			Labels:          load.Labels(src.Name, feProxySpec),
 			OwnerReferences: []metav1.OwnerReference{*or},
 		},
-		Data: map[string]string{
-			"nginx.conf": fmt.Sprintf(`
+		Type: corev1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			"nginx.conf": []byte(fmt.Sprintf(`
 pid   /tmp/nginx.pid;
 worker_processes 4;
 include /usr/share/nginx/modules/*.conf;
@@ -151,9 +154,9 @@ http {
     }
   }
 }
-`, resolver, proxyPass, feSearchServiceName),
+`, resolver, proxyPass, feSearchServiceName)),
 		},
 	}
 
-	return k8sutils.ApplyConfigMap(ctx, controller.k8sClient, &configmap)
+	return k8sutils.ApplySecret(ctx, controller.k8sClient, &secret)
 }

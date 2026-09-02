@@ -19,66 +19,10 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func TestMountConfigMapInfo(t *testing.T) {
-	type args struct {
-		volumes      []corev1.Volume
-		volumeMounts []corev1.VolumeMount
-		cmInfo       v1.ConfigMapInfo
-		mountPath    string
-	}
-	tests := []struct {
-		name  string
-		args  args
-		want  []corev1.Volume
-		want1 []corev1.VolumeMount
-	}{
-		{
-			name: "test mount configmap",
-			args: args{
-				cmInfo:    v1.ConfigMapInfo{ConfigMapName: "cm", ResolveKey: "key"},
-				mountPath: "/pkg/mounts/volume",
-			},
-			want: []corev1.Volume{
-				{
-					Name: "cm",
-					VolumeSource: corev1.VolumeSource{
-						ConfigMap: &corev1.ConfigMapVolumeSource{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "cm",
-							},
-						},
-					},
-				},
-			},
-			want1: []corev1.VolumeMount{
-				{
-					Name:      "cm",
-					MountPath: "/pkg/mounts/volume",
-				},
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, got1 := MountConfigMapInfo(tt.args.volumes, tt.args.volumeMounts, tt.args.cmInfo, tt.args.mountPath)
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("MountConfigMapInfo() got = %v, want %v", got, tt.want)
-			}
-			if !reflect.DeepEqual(got1, tt.want1) {
-				t.Errorf("MountConfigMapInfo() got1 = %v, want %v", got1, tt.want1)
-			}
-		})
-	}
-}
-
-var (
-	secretFileMode     = v1.SecretFileMode
-	executableFileMode = v1.ExecutableFileMode
-)
+var secretFileMode = v1.SecretFileMode
 
 func TestMountSecrets(t *testing.T) {
 	type args struct {
-		spec         v1.SpecInterface
 		volumes      []corev1.Volume
 		volumeMounts []corev1.VolumeMount
 		secrets      []v1.SecretReference
@@ -90,7 +34,7 @@ func TestMountSecrets(t *testing.T) {
 		want1 []corev1.VolumeMount
 	}{
 		{
-			name: "test mount configmaps",
+			name: "test mount secrets",
 			args: args{
 				secrets: []v1.SecretReference{
 					{
@@ -137,80 +81,7 @@ func TestMountSecrets(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1 := MountSecrets(tt.args.spec, tt.args.volumes, tt.args.volumeMounts, tt.args.secrets)
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("MountSecrets() got = %v, want %v", got, tt.want)
-			}
-			if !reflect.DeepEqual(got1, tt.want1) {
-				t.Errorf("MountSecrets() got1 = %v, want %v", got1, tt.want1)
-			}
-		})
-	}
-}
-
-func TestMountConfigMaps(t *testing.T) {
-	type args struct {
-		volumes      []corev1.Volume
-		volumeMounts []corev1.VolumeMount
-		configmaps   []v1.ConfigMapReference
-	}
-	tests := []struct {
-		name  string
-		args  args
-		want  []corev1.Volume
-		want1 []corev1.VolumeMount
-	}{
-		{
-			name: "test mount configmaps",
-			args: args{
-				configmaps: []v1.ConfigMapReference{
-					{
-						Name:      "s1",
-						MountPath: "/pkg/mounts/volumes1",
-					},
-					{
-						Name:      "s2",
-						MountPath: "/pkg/mounts/volumes2",
-					},
-				},
-			},
-			want: []corev1.Volume{
-				{
-					Name: "s1-1614",
-					VolumeSource: corev1.VolumeSource{
-						ConfigMap: &corev1.ConfigMapVolumeSource{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "s1",
-							},
-						},
-					},
-				},
-				{
-					Name: "s2-1229",
-					VolumeSource: corev1.VolumeSource{
-						ConfigMap: &corev1.ConfigMapVolumeSource{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "s2",
-							},
-						},
-					},
-				},
-			},
-			want1: []corev1.VolumeMount{
-				{
-					Name:      "s1-1614",
-					MountPath: "/pkg/mounts/volumes1",
-				},
-				{
-					Name:      "s2-1229",
-					MountPath: "/pkg/mounts/volumes2",
-				},
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, got1 := MountConfigMaps(nil, tt.args.volumes, tt.args.volumeMounts, tt.args.configmaps)
+			got, got1 := MountSecrets(tt.args.volumes, tt.args.volumeMounts, tt.args.secrets)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("MountSecrets() got = %v, want %v", got, tt.want)
 			}
@@ -441,24 +312,20 @@ func specWithReadOnlyRootFilesystem(readOnly bool) v1.SpecInterface {
 	}
 }
 
-// A Secret carrying a script the container executes itself has to stay executable, everything else is
-// mounted read-only for the owner and the fsGroup.
-func TestMountSecretsExecutableScript(t *testing.T) {
-	spec := &v1.StarRocksFeSpec{
-		StarRocksComponentSpec: v1.StarRocksComponentSpec{
-			Command: []string{"bash", "-c"},
-		},
-	}
+// Every mounted Secret gets SecretFileMode, whatever it carries and however it is mounted: a whole
+// directory, or a single file with a subPath next to a command of the deployment's own.
+func TestMountSecretsAlwaysReadOnly(t *testing.T) {
 	secrets := []v1.SecretReference{
 		{Name: "script", MountPath: "/opt/starrocks/entrypoint.sh", SubPath: "entrypoint.sh"},
 		{Name: "keytab", MountPath: "/etc/security/keytabs"},
 	}
 
-	volumes, _ := MountSecrets(spec, nil, nil, secrets)
+	volumes, _ := MountSecrets(nil, nil, secrets)
 
 	require.Equal(t, 2, len(volumes))
-	require.Equal(t, executableFileMode, *volumes[0].Secret.DefaultMode)
-	require.Equal(t, secretFileMode, *volumes[1].Secret.DefaultMode)
+	for i := range volumes {
+		require.Equal(t, secretFileMode, *volumes[i].Secret.DefaultMode)
+	}
 }
 
 func TestMountWritableTmpDir(t *testing.T) {

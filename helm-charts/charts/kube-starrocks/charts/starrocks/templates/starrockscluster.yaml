@@ -28,7 +28,8 @@ spec:
     {{- end }}
     image: "{{ .Values.starrocksFESpec.image.repository }}:{{ include "starrockscluster.fe.image.tag" . }}"
     {{- if .Values.starrocksFESpec.entrypoint }}
-    command: ["bash", "-c"]
+    # the script is mounted read-only, never executable, so bash reads it instead of exec'ing it
+    command: ["bash"]
     args:
       - {{template "starrockscluster.entrypoint.mount.path" .}}/{{template "starrockscluster.entrypoint.script.name" .}}
     {{- end }}
@@ -238,20 +239,10 @@ spec:
       mountPath: {{ .mountPath }}
       subPath: {{ .subPath }}
     {{- end }}
-    {{- if or .Values.starrocksFESpec.configMaps .Values.starrocksFESpec.entrypoint }}
-    configMaps:
-    {{- if .Values.starrocksFESpec.configMaps }}
-    {{- range .Values.starrocksFESpec.configMaps }}
-      - name: {{ .name }}
-        mountPath: {{ .mountPath }}
-        subPath: {{ .subPath }}
-    {{- end }}
-    {{- end }}
     {{- if .Values.starrocksFESpec.entrypoint }}
-      - name: {{template "starrockscluster.fe.entrypoint.script.configmap.name" .}}
-        mountPath: {{template "starrockscluster.entrypoint.mount.path" .}}/{{ template "starrockscluster.entrypoint.script.name" .}}
-        subPath: {{ template "starrockscluster.entrypoint.script.name" .}}
-    {{- end }}
+    - name: {{ template "starrockscluster.fe.entrypoint.script.secret.name" . }}
+      mountPath: {{ template "starrockscluster.entrypoint.mount.path" . }}/{{ template "starrockscluster.entrypoint.script.name" . }}
+      subPath: {{ template "starrockscluster.entrypoint.script.name" . }}
     {{- end }}
     {{- if or .Values.starrocksFESpec.storageSpec.name .Values.starrocksFESpec.emptyDirs .Values.starrocksFESpec.hostPaths }}
     storageVolumes:
@@ -301,7 +292,8 @@ spec:
     {{- end }}
     image: "{{ .Values.starrocksBeSpec.image.repository }}:{{ include "starrockscluster.be.image.tag" . }}"
     {{- if .Values.starrocksBeSpec.entrypoint }}
-    command: ["bash", "-c"]
+    # the script is mounted read-only, never executable, so bash reads it instead of exec'ing it
+    command: ["bash"]
     args:
       - {{template "starrockscluster.entrypoint.mount.path" .}}/{{template "starrockscluster.entrypoint.script.name" .}}
     {{- end }}
@@ -522,20 +514,10 @@ spec:
       mountPath: {{ .mountPath }}
       subPath: {{ .subPath }}
     {{- end }}
-    {{- if or .Values.starrocksBeSpec.configMaps .Values.starrocksBeSpec.entrypoint }}
-    configMaps:
-    {{- if .Values.starrocksBeSpec.configMaps }}
-    {{- range .Values.starrocksBeSpec.configMaps }}
-      - name: {{ .name }}
-        mountPath: {{ .mountPath }}
-        subPath: {{ .subPath }}
-    {{- end }}
-    {{- end }}
     {{- if .Values.starrocksBeSpec.entrypoint }}
-      - name: {{template "starrockscluster.be.entrypoint.script.configmap.name" .}}
-        mountPath: {{template "starrockscluster.entrypoint.mount.path" .}}/{{ template "starrockscluster.entrypoint.script.name" .}}
-        subPath: {{ template "starrockscluster.entrypoint.script.name" .}}
-    {{- end }}
+    - name: {{ template "starrockscluster.be.entrypoint.script.secret.name" . }}
+      mountPath: {{ template "starrockscluster.entrypoint.mount.path" . }}/{{ template "starrockscluster.entrypoint.script.name" . }}
+      subPath: {{ template "starrockscluster.entrypoint.script.name" . }}
     {{- end }}
     {{- if or .Values.starrocksBeSpec.storageSpec.name .Values.starrocksBeSpec.emptyDirs .Values.starrocksBeSpec.hostPaths }}
     storageVolumes:
@@ -607,7 +589,8 @@ spec:
     {{- end }}
     image: "{{ .Values.starrocksCnSpec.image.repository }}:{{ include "starrockscluster.cn.image.tag" . }}"
     {{- if .Values.starrocksCnSpec.entrypoint }}
-    command: ["bash", "-c"]
+    # the script is mounted read-only, never executable, so bash reads it instead of exec'ing it
+    command: ["bash"]
     args:
       - {{template "starrockscluster.entrypoint.mount.path" .}}/{{template "starrockscluster.entrypoint.script.name" .}}
     {{- end }}
@@ -835,20 +818,10 @@ spec:
       mountPath: {{ .mountPath }}
       subPath: {{ .subPath }}
     {{- end }}
-    {{- if or .Values.starrocksCnSpec.configMaps .Values.starrocksCnSpec.entrypoint }}
-    configMaps:
-    {{- if .Values.starrocksCnSpec.configMaps }}
-    {{- range .Values.starrocksCnSpec.configMaps }}
-      - name: {{ .name }}
-        mountPath: {{ .mountPath }}
-        subPath: {{ .subPath }}
-    {{- end }}
-    {{- end }}
     {{- if .Values.starrocksCnSpec.entrypoint }}
-      - name: {{template "starrockscluster.cn.entrypoint.script.configmap.name" .}}
-        mountPath: {{template "starrockscluster.entrypoint.mount.path" .}}/{{ template "starrockscluster.entrypoint.script.name" .}}
-        subPath: {{ template "starrockscluster.entrypoint.script.name" .}}
-    {{- end }}
+    - name: {{ template "starrockscluster.cn.entrypoint.script.secret.name" . }}
+      mountPath: {{ template "starrockscluster.entrypoint.mount.path" . }}/{{ template "starrockscluster.entrypoint.script.name" . }}
+      subPath: {{ template "starrockscluster.entrypoint.script.name" . }}
     {{- end }}
     {{- if or .Values.starrocksCnSpec.storageSpec.name .Values.starrocksCnSpec.emptyDirs .Values.starrocksCnSpec.hostPaths }}
     storageVolumes:

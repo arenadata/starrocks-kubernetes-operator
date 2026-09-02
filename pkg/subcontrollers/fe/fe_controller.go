@@ -80,11 +80,11 @@ func (fc *FeController) SyncCluster(ctx context.Context, src *srapi.StarRocksClu
 		return err
 	}
 
-	// get the fe configMap for resolve ports
-	logger.V(log.DebugLevel).Info("get fe configMap to resolve ports", "ConfigMapInfo", feSpec.ConfigMapInfo)
+	// get the fe config to resolve ports
+	logger.V(log.DebugLevel).Info("get fe config to resolve ports", "secrets", feSpec.Secrets)
 	feConfig, err := GetFEConfig(ctx, fc.Client, feSpec, src.Namespace)
 	if err != nil {
-		logger.Error(err, "get fe config failed", "ConfigMapInfo", feSpec.ConfigMapInfo)
+		logger.Error(err, "get fe config failed", "secrets", feSpec.Secrets)
 		return err
 	}
 

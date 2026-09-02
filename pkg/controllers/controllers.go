@@ -39,12 +39,11 @@ func SetupClusterReconciler(mgr ctrl.Manager) error {
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *StarRocksClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	// TODO: AD use secrets instead configmaps
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&srapi.StarRocksCluster{}).
 		Owns(&appsv1.StatefulSet{}).
 		Owns(&appsv1.Deployment{}).
-		Owns(&corev1.ConfigMap{}).
+		Owns(&corev1.Secret{}).
 		Owns(&corev1.Service{}).
 		Owns(&v2.HorizontalPodAutoscaler{}).
 		WithEventFilter(predicates.NewGenericPredicates()).
@@ -57,11 +56,10 @@ func (r *StarRocksWarehouseReconciler) SetupWithManager(mgr ctrl.Manager) error 
 	r.recorder = mgr.GetEventRecorderFor("starrockswarehouse-controller")
 	r.subControllers = []subcontrollers.WarehouseSubController{cn.New(mgr.GetClient(), mgr.GetEventRecorderFor)}
 
-	// TODO: AD use secrets instead configmaps
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&srapi.StarRocksWarehouse{}).
 		Owns(&appsv1.StatefulSet{}).
-		Owns(&corev1.ConfigMap{}).
+		Owns(&corev1.Secret{}).
 		Owns(&corev1.Service{}).
 		Owns(&v2.HorizontalPodAutoscaler{}).
 		WithOptions(controller.Options{SkipNameValidation: new(true)}).

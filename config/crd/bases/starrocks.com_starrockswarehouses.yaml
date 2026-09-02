@@ -1724,47 +1724,6 @@ spec:
                     items:
                       type: string
                     type: array
-                  configMapInfo:
-                    description: the reference for configMap which store the config
-                      info to start starrocks. e.g. be.conf, fe.conf, cn.conf.
-                    properties:
-                      configMapName:
-                        description: the config info for start progress.
-                        type: string
-                      resolveKey:
-                        description: the config response key in configmap.
-                        type: string
-                    type: object
-                  configMaps:
-                    description: the reference for configMap which allow users to
-                      mount any files to container.
-                    items:
-                      description: |-
-                        MountInfo
-                        The reason why we do not support defaultMode is that we use hash.HashObject to
-                        calculate the actual volume name. This volume name is used in pod template of statefulset,
-                        and if this MountInfo type has been changed, the volume name will be changed too, and
-                        that will make pods restart.
-                        The permissions of the mounted files are decided by the operator instead, see SecretFileMode and
-                        ExecutableFileMode.
-                      properties:
-                        mountPath:
-                          description: |-
-                            Path within the container at which the volume should be mounted.  Must
-                            not contain ':'.
-                          type: string
-                        name:
-                          description: |-
-                            This must match the Name of a ConfigMap or Secret in the same namespace, and
-                            the length of name must not more than 50 characters.
-                          type: string
-                        subPath:
-                          description: |-
-                            SubPath within the volume from which the container's volume should be mounted.
-                            Defaults to "" (volume's root).
-                          type: string
-                      type: object
-                    type: array
                   envVars:
                     description: envVars is a slice of environment variables that
                       are added to the pods, the default is empty.
@@ -4109,7 +4068,8 @@ spec:
                       that will be used to schedule the pods.
                     type: string
                   secrets:
-                    description: the reference for secrets.
+                    description: the reference for secrets, which allow users to mount
+                      any files to container.
                     items:
                       description: |-
                         MountInfo
@@ -4117,8 +4077,7 @@ spec:
                         calculate the actual volume name. This volume name is used in pod template of statefulset,
                         and if this MountInfo type has been changed, the volume name will be changed too, and
                         that will make pods restart.
-                        The permissions of the mounted files are decided by the operator instead, see SecretFileMode and
-                        ExecutableFileMode.
+                        The permissions of the mounted files are decided by the operator instead, see SecretFileMode.
                       properties:
                         mountPath:
                           description: |-
@@ -4127,7 +4086,7 @@ spec:
                           type: string
                         name:
                           description: |-
-                            This must match the Name of a ConfigMap or Secret in the same namespace, and
+                            This must match the Name of a Secret in the same namespace, and
                             the length of name must not more than 50 characters.
                           type: string
                         subPath:

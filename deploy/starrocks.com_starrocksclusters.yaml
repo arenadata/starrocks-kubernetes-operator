@@ -618,24 +618,6 @@ spec:
                     items:
                       type: string
                     type: array
-                  configMapInfo:
-                    properties:
-                      configMapName:
-                        type: string
-                      resolveKey:
-                        type: string
-                    type: object
-                  configMaps:
-                    items:
-                      properties:
-                        mountPath:
-                          type: string
-                        name:
-                          type: string
-                        subPath:
-                          type: string
-                      type: object
-                    type: array
                   hostAliases:
                     items:
                       properties:
@@ -3534,24 +3516,6 @@ spec:
                     items:
                       type: string
                     type: array
-                  configMapInfo:
-                    properties:
-                      configMapName:
-                        type: string
-                      resolveKey:
-                        type: string
-                    type: object
-                  configMaps:
-                    items:
-                      properties:
-                        mountPath:
-                          type: string
-                        name:
-                          type: string
-                        subPath:
-                          type: string
-                      type: object
-                    type: array
                   hostAliases:
                     items:
                       properties:
@@ -5995,13 +5959,6 @@ spec:
                     x-kubernetes-list-map-keys:
                     - name
                     x-kubernetes-list-type: map
-                  configMapInfo:
-                    properties:
-                      configMapName:
-                        type: string
-                      resolveKey:
-                        type: string
-                    type: object
                   image:
                     type: string
                   imagePullPolicy:
@@ -6800,24 +6757,6 @@ spec:
                   command:
                     items:
                       type: string
-                    type: array
-                  configMapInfo:
-                    properties:
-                      configMapName:
-                        type: string
-                      resolveKey:
-                        type: string
-                    type: object
-                  configMaps:
-                    items:
-                      properties:
-                        mountPath:
-                          type: string
-                        name:
-                          type: string
-                        subPath:
-                          type: string
-                      type: object
                     type: array
                   feEnvVars:
                     items:

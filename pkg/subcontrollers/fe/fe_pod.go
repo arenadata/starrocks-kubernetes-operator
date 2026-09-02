@@ -46,12 +46,10 @@ func (fc *FeController) buildPodTemplate(src *srapi.StarRocksCluster, config map
 		vols, volMounts = pod.MountEmptyDirVolume(vols, volMounts, _logName, pod.GetLogDir(feSpec), "")
 	}
 
-	// Mount the configuration and the secrets. The configuration is mounted over the conf directory of
-	// the installation: the entrypoint scripts of the image do not copy it anywhere any more, they read
-	// it where it is mounted.
-	vols, volMounts = pod.MountConfigMapInfo(vols, volMounts, feSpec.ConfigMapInfo, pod.GetConfigDir(feSpec))
-	vols, volMounts = pod.MountConfigMaps(feSpec, vols, volMounts, feSpec.ConfigMaps)
-	vols, volMounts = pod.MountSecrets(feSpec, vols, volMounts, feSpec.Secrets)
+	// Mount the Secrets. The configuration is one of them, mounted over the conf directory of the
+	// installation: the entrypoint scripts of the image do not copy it anywhere any more, they read it
+	// where it is mounted.
+	vols, volMounts = pod.MountSecrets(vols, volMounts, feSpec.Secrets)
 	vols, volMounts = pod.MountWritableTmpDir(feSpec, vols, volMounts)
 	if err := k8sutils.CheckVolumes(vols, volMounts); err != nil {
 		return nil, err

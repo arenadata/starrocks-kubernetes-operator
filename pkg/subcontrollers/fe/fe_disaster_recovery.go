@@ -10,13 +10,19 @@ import (
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/StarRocks/starrocks-kubernetes-operator/pkg/apis/starrocks/v1"
 	rutils "github.com/StarRocks/starrocks-kubernetes-operator/pkg/common/resource_utils"
+	"github.com/StarRocks/starrocks-kubernetes-operator/pkg/k8sutils"
 	"github.com/StarRocks/starrocks-kubernetes-operator/pkg/k8sutils/load"
+	"github.com/StarRocks/starrocks-kubernetes-operator/pkg/k8sutils/templates/pod"
 )
+
+// clusterSnapshotFileName is the file the FE reads the cluster snapshot from when it is restored.
+const clusterSnapshotFileName = "cluster_snapshot.yaml"
 
 func ShouldEnterDisasterRecoveryMode(drSpec *v1.DisasterRecovery,
 	drStatus *v1.DisasterRecoveryStatus, feConfig map[string]interface{}) (bool, int32) {
@@ -61,9 +67,13 @@ func EnterDisasterRecoveryMode(ctx context.Context, k8sClient client.Client,
 
 	switch drStatus.Phase {
 	case v1.DRPhaseTodo:
-		if !hasClusterSnapshotConf(feSpec.ConfigMaps, feSpec.Secrets) {
+		mounted, err := hasClusterSnapshotConf(ctx, k8sClient, src.Namespace, feSpec)
+		if err != nil {
+			return err
+		}
+		if !mounted {
 			drStatus.Phase = v1.DRPhaseTodo
-			reason := "cluster_snapshot.yaml is not mounted"
+			reason := clusterSnapshotFileName + " is not mounted"
 			drStatus.Reason = reason
 			return errors.New(reason)
 		}
@@ -85,24 +95,41 @@ func EnterDisasterRecoveryMode(ctx context.Context, k8sClient client.Client,
 	return nil
 }
 
-// hasClusterSnapshotConf checks all the mount paths, to make sure cluster_snapshot.yaml is mounted, no
-// matter whether the configuration comes from a ConfigMap or from a Secret.
-func hasClusterSnapshotConf(configMaps []v1.ConfigMapReference, secrets []v1.SecretReference) bool {
-	mounts := make([]v1.MountInfo, 0, len(configMaps)+len(secrets))
-	for i := range configMaps {
-		mounts = append(mounts, v1.MountInfo(configMaps[i]))
-	}
-	for i := range secrets {
-		mounts = append(mounts, v1.MountInfo(secrets[i]))
-	}
-	for _, sv := range mounts {
-		if strings.Contains(sv.SubPath, "cluster_snapshot.yaml") ||
-			strings.HasSuffix(sv.MountPath, "fe/conf") ||
-			strings.HasSuffix(sv.MountPath, "fe/conf/") {
-			return true
+// hasClusterSnapshotConf reports whether cluster_snapshot.yaml is mounted into the conf directory of the
+// FE. Matching the mount path is not enough: the configuration Secret is mounted over that directory in
+// every deployment, so the Secret that provides it has to carry the file as well.
+func hasClusterSnapshotConf(ctx context.Context, k8sClient client.Client,
+	namespace string, feSpec *v1.StarRocksFeSpec) (bool, error) {
+	confDir := pod.GetConfigDir(feSpec)
+	for i := range feSpec.Secrets {
+		reference := feSpec.Secrets[i]
+		if reference.SubPath != "" {
+			if strings.Contains(reference.SubPath, clusterSnapshotFileName) {
+				return true, nil
+			}
+			continue
+		}
+		if !mountsConfDir(reference.MountPath, confDir) {
+			continue
+		}
+		secret, err := k8sutils.GetSecret(ctx, k8sClient, namespace, reference.Name)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			return false, err
+		}
+		if _, ok := secret.Data[clusterSnapshotFileName]; ok {
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
+}
+
+// mountsConfDir reports whether mountPath replaces the whole conf directory of the FE.
+func mountsConfDir(mountPath, confDir string) bool {
+	mountPath = strings.TrimSuffix(mountPath, "/")
+	return mountPath == confDir || strings.HasSuffix(mountPath, "fe/conf")
 }
 
 func rewriteStatefulSetForDisasterRecovery(expectSts *appsv1.StatefulSet, generation int64, queryPort int32) *appsv1.StatefulSet {

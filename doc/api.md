@@ -136,99 +136,6 @@ The possible value for component phase are: reconciling, failed, running.</p>
 </td>
 </tr></tbody>
 </table>
-<h3 id="starrocks.com/v1.ConfigMapInfo">ConfigMapInfo
-</h3>
-<p>
-(<em>Appears on:</em><a href="#starrocks.com/v1.StarRocksLoadSpec">StarRocksLoadSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>configMapName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>the config info for start progress.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>resolveKey</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>the config response key in configmap.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="starrocks.com/v1.ConfigMapReference">ConfigMapReference
-</h3>
-<p>
-(<em>Appears on:</em><a href="#starrocks.com/v1.StarRocksComponentSpec">StarRocksComponentSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>This must match the Name of a ConfigMap or Secret in the same namespace, and
-the length of name must not more than 50 characters.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>mountPath</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Path within the container at which the volume should be mounted.  Must
-not contain &lsquo;:&rsquo;.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>subPath</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>SubPath within the volume from which the container&rsquo;s volume should be mounted.
-Defaults to &ldquo;&rdquo; (volume&rsquo;s root).</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="starrocks.com/v1.DRPhase">DRPhase
 (<code>string</code> alias)</h3>
 <p>
@@ -469,8 +376,7 @@ The reason why we do not support defaultMode is that we use hash.HashObject to
 calculate the actual volume name. This volume name is used in pod template of statefulset,
 and if this MountInfo type has been changed, the volume name will be changed too, and
 that will make pods restart.
-The permissions of the mounted files are decided by the operator instead, see SecretFileMode and
-ExecutableFileMode.</p>
+The permissions of the mounted files are decided by the operator instead, see SecretFileMode.</p>
 </div>
 <table>
 <thead>
@@ -488,7 +394,7 @@ string
 </em>
 </td>
 <td>
-<p>This must match the Name of a ConfigMap or Secret in the same namespace, and
+<p>This must match the Name of a Secret in the same namespace, and
 the length of name must not more than 50 characters.</p>
 </td>
 </tr>
@@ -571,7 +477,7 @@ string
 </em>
 </td>
 <td>
-<p>This must match the Name of a ConfigMap or Secret in the same namespace, and
+<p>This must match the Name of a Secret in the same namespace, and
 the length of name must not more than 50 characters.</p>
 </td>
 </tr>
@@ -1306,20 +1212,6 @@ Deprecated: set capabilities in SecurityContext instead.</p>
 </tr>
 <tr>
 <td>
-<code>configMaps</code><br/>
-<em>
-<a href="#starrocks.com/v1.ConfigMapReference">
-[]ConfigMapReference
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>the reference for configMap which allow users to mount any files to container.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>secrets</code><br/>
 <em>
 <a href="#starrocks.com/v1.SecretReference">
@@ -1329,7 +1221,7 @@ Deprecated: set capabilities in SecurityContext instead.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>the reference for secrets.</p>
+<p>the reference for secrets, which allow users to mount any files to container.</p>
 </td>
 </tr>
 <tr>
@@ -2032,20 +1924,6 @@ string
 </tr>
 <tr>
 <td>
-<code>configMapInfo</code><br/>
-<em>
-<a href="#starrocks.com/v1.ConfigMapInfo">
-ConfigMapInfo
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>the reference for configMap which store the config info to start starrocks. e.g. be.conf, fe.conf, cn.conf.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>startupProbeFailureSeconds</code><br/>
 <em>
 int32
@@ -2686,5 +2564,5 @@ AutoScalingPolicy
 <hr/>
 <p><em>
 Generated with <code>gen-crd-api-reference-docs</code>
-on git commit <code>a71efb1</code>.
+on git commit <code>20dc584</code>.
 </em></p>

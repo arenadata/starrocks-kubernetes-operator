@@ -2,7 +2,7 @@
 # see https://docs.starrocks.io/docs/cover_pages/shared_data_deployment/ for more information about shared-data mode.
 #
 # You will have to download and edit this YAML file to specify the details for your shared storage. See the 
-# examples in the docs, and add your customizations to the ConfigMap `starrockscluster-sample-fe-cm` at the 
+# examples in the docs, and add your customizations to the Secret `starrockscluster-sample-fe-conf` at the 
 # bottom of this file.
 # https://docs.starrocks.io/docs/deployment/shared_data/s3/#configure-fe-nodes-for-shared-data-starrocks
 
@@ -20,9 +20,9 @@ spec:
     requests:
       cpu: 8
       memory: 16Gi
-    configMapInfo:
-      configMapName: starrockscluster-sample-fe-cm
-      resolveKey: fe.conf
+    secrets:
+      - name: starrockscluster-sample-fe-conf
+        mountPath: /opt/starrocks/fe/conf
   starRocksCnSpec:
     image: starrocks/cn-ubuntu:latest
     replicas: 1
@@ -37,12 +37,13 @@ spec:
 
 # fe config
 apiVersion: v1
-kind: ConfigMap
+kind: Secret
 metadata:
-  name: starrockscluster-sample-fe-cm
+  name: starrockscluster-sample-fe-conf
   labels:
     cluster: starrockscluster-sample
-data:
+type: Opaque
+stringData:
   fe.conf: |
     LOG_DIR = ${STARROCKS_HOME}/log
     DATE = "$(date +%Y%m%d-%H%M%S)"

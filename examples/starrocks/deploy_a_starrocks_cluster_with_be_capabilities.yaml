@@ -26,9 +26,9 @@ spec:
       - name: TZ
         value: Asia/Shanghai
     terminationGracePeriodSeconds: 120
-    configMapInfo:
-      configMapName: kube-starrocks-fe-cm
-      resolveKey: fe.conf
+    secrets:
+      - name: kube-starrocks-fe-conf
+        mountPath: /opt/starrocks/fe/conf
   starRocksBeSpec:
     image: "starrocks/be-ubuntu:4.1-latest"
     replicas: 1
@@ -53,6 +53,6 @@ spec:
       - name: TZ
         value: Asia/Shanghai
     terminationGracePeriodSeconds: 120
-    configMapInfo:
-      configMapName: kube-starrocks-be-cm
-      resolveKey: be.conf
+    secrets:
+      - name: kube-starrocks-be-conf
+        mountPath: /opt/starrocks/be/conf

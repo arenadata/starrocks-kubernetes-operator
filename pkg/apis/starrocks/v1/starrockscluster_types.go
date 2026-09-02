@@ -340,9 +340,12 @@ func (spec *StarRocksFeProxySpec) GetSysctls() []corev1.Sysctl { return nil }
 func (spec *StarRocksFeProxySpec) GetSecurityContext() *corev1.SecurityContext { return nil }
 
 // GetPodSecurityContext
-// fe proxy does not have field PodSecurityContext, the reason why implementing this method is
-// that StarRocksFeProxySpec needs to implement SpecInterface interface
-func (spec *StarRocksFeProxySpec) GetPodSecurityContext() *corev1.PodSecurityContext { return nil }
+// fe proxy does not have field PodSecurityContext, but its configuration Secret is mounted with
+// SecretFileMode, so the pod has to declare the group nginx runs with as FSGroup.
+func (spec *StarRocksFeProxySpec) GetPodSecurityContext() *corev1.PodSecurityContext {
+	groupID := NginxGroupID
+	return &corev1.PodSecurityContext{FSGroup: &groupID}
+}
 
 // GetMinReadySeconds
 // fe proxy does not have field MinReadySeconds, the reason why implementing this method is

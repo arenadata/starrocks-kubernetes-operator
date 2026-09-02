@@ -112,14 +112,6 @@ spec:
       mountPath: {{ .mountPath }}
       subPath: {{ .subPath }}
     {{- end }}
-    {{- if .Values.spec.configMaps }}
-    configMaps:
-    {{- range .Values.spec.configMaps }}
-      - name: {{ .name }}
-        mountPath: {{ .mountPath }}
-        subPath: {{ .subPath }}
-    {{- end }}
-    {{- end }}
     {{- if .Values.spec.storageSpec.name }}
     storageVolumes:
     - name: {{ .Values.spec.storageSpec.name }}{{template "starrockscluster.cn.data.suffix" . }}

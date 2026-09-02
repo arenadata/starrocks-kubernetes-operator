@@ -48,8 +48,8 @@ For CN component, the reconcile is paused.
 
 The reconcile process for FE is as follows:
 
-1. Traverse `spec.starrocksFESpec.ConfigMaps` to confirm that `cluster_snapshot.yaml` has been mounted. Currently,
-   this check is relatively simple, mainly to check whether the `SubPath` field is equal to `cluster_snapshot.yaml`.
+1. Traverse `spec.starrocksFESpec.Secrets` to confirm that `cluster_snapshot.yaml` has been mounted, either with a
+   `SubPath` of its own or as a key of the Secret that is mounted over the conf directory of the FE.
 2. Modify the FE Statefulset, including:
     1. Start a single-replica FE.
     2. Inject the `RESTORE_CLUSTER_GENERATION` and `RESTORE_CLUSTER_SNAPSHOT` environment variables. The former is
@@ -330,12 +330,12 @@ starrocks:
       enabled: true
       generation: 1
   starrocksFESpec: # mount the cluster_snapshot.yaml
-    configMaps:
+    secrets:
       - name: cluster-snapshot
         mountPath: /opt/starrocks/fe/conf/cluster_snapshot.yaml
         subPath: cluster_snapshot.yaml
 
-  configMaps:
+  secrets:
     - name: cluster-snapshot
       data:
         cluster_snapshot.yaml: |
