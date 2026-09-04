@@ -28,11 +28,9 @@ import (
 )
 
 const (
-	_logName         = "be-log"
-	_beConfigPath    = "/etc/starrocks/be/conf"
-	_storageName     = "be-storage"
-	_storageName2    = "be-data" // helm chart use this format
-	_envBeConfigPath = "CONFIGMAP_MOUNT_PATH"
+	_logName      = "be-log"
+	_storageName  = "be-storage"
+	_storageName2 = "be-data" // helm chart use this format
 )
 
 // buildPodTemplate construct the podTemplate for deploy cn.
@@ -53,10 +51,11 @@ func (be *BeController) buildPodTemplate(src *srapi.StarRocksCluster, config map
 		vols, volumeMounts = pod.MountEmptyDirVolume(vols, volumeMounts, _logName, pod.GetLogDir(beSpec), "")
 	}
 
-	// mount configmap, secrets to pod if needed
-	vols, volumeMounts = pod.MountConfigMapInfo(vols, volumeMounts, beSpec.ConfigMapInfo, _beConfigPath)
-	vols, volumeMounts = pod.MountConfigMaps(beSpec, vols, volumeMounts, beSpec.ConfigMaps)
+	// Mount the Secrets. The configuration is one of them, mounted over the conf directory of the
+	// installation: the entrypoint scripts of the image do not copy it anywhere any more, they read it
+	// where it is mounted.
 	vols, volumeMounts = pod.MountSecrets(vols, volumeMounts, beSpec.Secrets)
+	vols, volumeMounts = pod.MountWritableTmpDir(beSpec, vols, volumeMounts)
 	if err := k8sutils.CheckVolumes(vols, volumeMounts); err != nil {
 		return nil, err
 	}
@@ -82,12 +81,6 @@ func (be *BeController) buildPodTemplate(src *srapi.StarRocksCluster, config map
 	}
 	if pod.GetStarRocksRootPath(beSpec.BeEnvVars) != pod.GetStarRocksDefaultRootPath() {
 		beContainer.WorkingDir = pod.GetStarRocksRootPath(beSpec.BeEnvVars)
-	}
-	if beSpec.ConfigMapInfo.ConfigMapName != "" && beSpec.ConfigMapInfo.ResolveKey != "" {
-		beContainer.Env = append(beContainer.Env, corev1.EnvVar{
-			Name:  _envBeConfigPath,
-			Value: _beConfigPath,
-		})
 	}
 
 	podSpec := pod.Spec(beSpec, beContainer, vols)

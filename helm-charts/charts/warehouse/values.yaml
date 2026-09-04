@@ -167,13 +167,6 @@ spec:
     # - name: my-secret
     #   mountPath: /etc/my-secret
     #   subPath: ""
-  # mount configmaps if necessary.
-  # see https://kubernetes.io/docs/concepts/storage/volumes/#using-subpath for more details about subPath.
-  configMaps: []
-    # e.g., mount my-configmap to /etc/my-configmap
-    # - name: my-configmap
-    #   mountPath: /etc/my-configmap
-    #   subPath: ""
   # n storageSpec for persistent data.
   storageSpec:
     # the name of volume for mount. if not will use emptyDir.
@@ -197,13 +190,4 @@ secrets: []
   #   data:
   #     key: |
   #       this is the content of the secret
-  #       when mounted, the key will be the name of the file
-
-# create configmaps if necessary.
-configMaps: []
-  # e.g., create my-configmap
-  # - name: my-configmap
-  #   data:
-  #     key: |
-  #       this is the content of the configmap
   #       when mounted, the key will be the name of the file

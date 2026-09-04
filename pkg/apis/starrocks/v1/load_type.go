@@ -158,10 +158,6 @@ type StarRocksLoadSpec struct {
 	// serviceAccount for access cloud service.
 	ServiceAccount string `json:"serviceAccount,omitempty"`
 
-	// the reference for configMap which store the config info to start starrocks. e.g. be.conf, fe.conf, cn.conf.
-	// +optional
-	ConfigMapInfo ConfigMapInfo `json:"configMapInfo,omitempty"`
-
 	// StartupProbeFailureSeconds defines the total failure seconds of startup Probe.
 	// Default failureThreshold is 60 and the periodSeconds is 5, this means the startup
 	// will fail if the pod can't start in 300 seconds. Your StartupProbeFailureSeconds is

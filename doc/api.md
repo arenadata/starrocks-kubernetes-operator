@@ -136,99 +136,6 @@ The possible value for component phase are: reconciling, failed, running.</p>
 </td>
 </tr></tbody>
 </table>
-<h3 id="starrocks.com/v1.ConfigMapInfo">ConfigMapInfo
-</h3>
-<p>
-(<em>Appears on:</em><a href="#starrocks.com/v1.StarRocksLoadSpec">StarRocksLoadSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>configMapName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>the config info for start progress.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>resolveKey</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>the config response key in configmap.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="starrocks.com/v1.ConfigMapReference">ConfigMapReference
-</h3>
-<p>
-(<em>Appears on:</em><a href="#starrocks.com/v1.StarRocksComponentSpec">StarRocksComponentSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>This must match the Name of a ConfigMap or Secret in the same namespace, and
-the length of name must not more than 50 characters.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>mountPath</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Path within the container at which the volume should be mounted.  Must
-not contain &lsquo;:&rsquo;.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>subPath</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>SubPath within the volume from which the container&rsquo;s volume should be mounted.
-Defaults to &ldquo;&rdquo; (volume&rsquo;s root).</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="starrocks.com/v1.DRPhase">DRPhase
 (<code>string</code> alias)</h3>
 <p>
@@ -469,9 +376,7 @@ The reason why we do not support defaultMode is that we use hash.HashObject to
 calculate the actual volume name. This volume name is used in pod template of statefulset,
 and if this MountInfo type has been changed, the volume name will be changed too, and
 that will make pods restart.
-The default mode is 0644, and in order to support to set permission information for a configMap
-or secret, we add should specify the subPath and specify a command or args in the container.
-And It will be set 0755.</p>
+The permissions of the mounted files are decided by the operator instead, see SecretFileMode.</p>
 </div>
 <table>
 <thead>
@@ -489,7 +394,7 @@ string
 </em>
 </td>
 <td>
-<p>This must match the Name of a ConfigMap or Secret in the same namespace, and
+<p>This must match the Name of a Secret in the same namespace, and
 the length of name must not more than 50 characters.</p>
 </td>
 </tr>
@@ -572,7 +477,7 @@ string
 </em>
 </td>
 <td>
-<p>This must match the Name of a ConfigMap or Secret in the same namespace, and
+<p>This must match the Name of a Secret in the same namespace, and
 the length of name must not more than 50 characters.</p>
 </td>
 </tr>
@@ -1243,6 +1148,40 @@ StarRocksLoadSpec
 </tr>
 <tr>
 <td>
+<code>securityContext</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.24/#securitycontext-v1-core">
+Kubernetes core/v1.SecurityContext
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SecurityContext holds the security settings of the StarRocks container. Every field set here wins
+over what the operator derives from the deprecated shortcuts below, everything else keeps its
+default, so that a deployment can express what its policy requires - a seccomp profile, dropping
+all capabilities, a specific user - without the operator having to know about the field.
+See <a href="https://kubernetes.io/docs/tasks/configure-pod-container/security-context/">https://kubernetes.io/docs/tasks/configure-pod-container/security-context/</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podSecurityContext</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.24/#podsecuritycontext-v1-core">
+Kubernetes core/v1.PodSecurityContext
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodSecurityContext holds the security settings of the pod, applied the same way as SecurityContext.
+Note that the operator sets FSGroup by default: the configuration and the other Secrets are mounted
+with mode 0440 and belong to that group, without it the StarRocks process can not read them.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>runAsNonRoot</code><br/>
 <em>
 bool
@@ -1251,7 +1190,8 @@ bool
 <td>
 <p>RunAsNonRoot is used to determine whether to run starrocks as a normal user.
 If RunAsNonRoot is true, operator will set RunAsUser and RunAsGroup to 1000 in securityContext.
-default: nil</p>
+default: nil
+Deprecated: set runAsUser/runAsGroup/runAsNonRoot in SecurityContext instead.</p>
 </td>
 </tr>
 <tr>
@@ -1266,21 +1206,8 @@ Kubernetes core/v1.Capabilities
 <td>
 <em>(Optional)</em>
 <p>refer to <a href="https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-capabilities-for-a-container">https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-capabilities-for-a-container</a>
-grant certain privileges to a process without granting all the privileges of the root user</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>configMaps</code><br/>
-<em>
-<a href="#starrocks.com/v1.ConfigMapReference">
-[]ConfigMapReference
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>the reference for configMap which allow users to mount any files to container.</p>
+grant certain privileges to a process without granting all the privileges of the root user
+Deprecated: set capabilities in SecurityContext instead.</p>
 </td>
 </tr>
 <tr>
@@ -1294,7 +1221,7 @@ grant certain privileges to a process without granting all the privileges of the
 </td>
 <td>
 <em>(Optional)</em>
-<p>the reference for secrets.</p>
+<p>the reference for secrets, which allow users to mount any files to container.</p>
 </td>
 </tr>
 <tr>
@@ -1431,8 +1358,14 @@ bool
 Default is false.
 Note that:
 1. This field cannot be set when spec.os.name is windows.
-2. The FE/BE/CN container should support read-only root filesystem. The newest version of FE/BE/CN is 3.3.6,
-and does not support read-only root filesystem</p>
+2. The image has to keep its configuration directory read-only and write its pid file outside of
+the installation. StarRocks images do so since 4.4.0/4.0.10.1; with an older image the
+components fail to start or silently ignore the mounted configuration.
+3. When it is enabled the operator mounts an emptyDir at /tmp and points PID_DIR (and
+UDF_RUNTIME_DIR for BE/CN) at it. Anything else the deployment writes to - the spill
+directory, small files, FE tmp_dir - has to be pointed at a volume in the configuration.
+Deprecated: set readOnlyRootFilesystem in SecurityContext instead, the operator honors it there
+as well.</p>
 </td>
 </tr>
 <tr>
@@ -1446,7 +1379,8 @@ and does not support read-only root filesystem</p>
 </td>
 <td>
 <p>Sysctls defines a list of namespaced sysctls for the podSecurityContext.sysctls
-See <a href="https://kubernetes.io/docs/tasks/administer-cluster/sysctl-cluster/">https://kubernetes.io/docs/tasks/administer-cluster/sysctl-cluster/</a> for more details.</p>
+See <a href="https://kubernetes.io/docs/tasks/administer-cluster/sysctl-cluster/">https://kubernetes.io/docs/tasks/administer-cluster/sysctl-cluster/</a> for more details.
+Deprecated: set sysctls in PodSecurityContext instead.</p>
 </td>
 </tr>
 <tr>
@@ -1986,20 +1920,6 @@ string
 </td>
 <td>
 <p>serviceAccount for access cloud service.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>configMapInfo</code><br/>
-<em>
-<a href="#starrocks.com/v1.ConfigMapInfo">
-ConfigMapInfo
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>the reference for configMap which store the config info to start starrocks. e.g. be.conf, fe.conf, cn.conf.</p>
 </td>
 </tr>
 <tr>
@@ -2644,5 +2564,5 @@ AutoScalingPolicy
 <hr/>
 <p><em>
 Generated with <code>gen-crd-api-reference-docs</code>
-on git commit <code>5385134</code>.
+on git commit <code>20dc584</code>.
 </em></p>

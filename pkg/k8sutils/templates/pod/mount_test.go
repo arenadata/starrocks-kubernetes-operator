@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/StarRocks/starrocks-kubernetes-operator/cmd/config"
@@ -18,57 +19,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func TestMountConfigMapInfo(t *testing.T) {
-	type args struct {
-		volumes      []corev1.Volume
-		volumeMounts []corev1.VolumeMount
-		cmInfo       v1.ConfigMapInfo
-		mountPath    string
-	}
-	tests := []struct {
-		name  string
-		args  args
-		want  []corev1.Volume
-		want1 []corev1.VolumeMount
-	}{
-		{
-			name: "test mount configmap",
-			args: args{
-				cmInfo:    v1.ConfigMapInfo{ConfigMapName: "cm", ResolveKey: "key"},
-				mountPath: "/pkg/mounts/volume",
-			},
-			want: []corev1.Volume{
-				{
-					Name: "cm",
-					VolumeSource: corev1.VolumeSource{
-						ConfigMap: &corev1.ConfigMapVolumeSource{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "cm",
-							},
-						},
-					},
-				},
-			},
-			want1: []corev1.VolumeMount{
-				{
-					Name:      "cm",
-					MountPath: "/pkg/mounts/volume",
-				},
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, got1 := MountConfigMapInfo(tt.args.volumes, tt.args.volumeMounts, tt.args.cmInfo, tt.args.mountPath)
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("MountConfigMapInfo() got = %v, want %v", got, tt.want)
-			}
-			if !reflect.DeepEqual(got1, tt.want1) {
-				t.Errorf("MountConfigMapInfo() got1 = %v, want %v", got1, tt.want1)
-			}
-		})
-	}
-}
+var secretFileMode = v1.SecretFileMode
 
 func TestMountSecrets(t *testing.T) {
 	type args struct {
@@ -83,7 +34,7 @@ func TestMountSecrets(t *testing.T) {
 		want1 []corev1.VolumeMount
 	}{
 		{
-			name: "test mount configmaps",
+			name: "test mount secrets",
 			args: args{
 				secrets: []v1.SecretReference{
 					{
@@ -101,7 +52,8 @@ func TestMountSecrets(t *testing.T) {
 					Name: "s1-1614",
 					VolumeSource: corev1.VolumeSource{
 						Secret: &corev1.SecretVolumeSource{
-							SecretName: "s1",
+							SecretName:  "s1",
+							DefaultMode: &secretFileMode,
 						},
 					},
 				},
@@ -109,7 +61,8 @@ func TestMountSecrets(t *testing.T) {
 					Name: "s2-1229",
 					VolumeSource: corev1.VolumeSource{
 						Secret: &corev1.SecretVolumeSource{
-							SecretName: "s2",
+							SecretName:  "s2",
+							DefaultMode: &secretFileMode,
 						},
 					},
 				},
@@ -129,79 +82,6 @@ func TestMountSecrets(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, got1 := MountSecrets(tt.args.volumes, tt.args.volumeMounts, tt.args.secrets)
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("MountSecrets() got = %v, want %v", got, tt.want)
-			}
-			if !reflect.DeepEqual(got1, tt.want1) {
-				t.Errorf("MountSecrets() got1 = %v, want %v", got1, tt.want1)
-			}
-		})
-	}
-}
-
-func TestMountConfigMaps(t *testing.T) {
-	type args struct {
-		volumes      []corev1.Volume
-		volumeMounts []corev1.VolumeMount
-		configmaps   []v1.ConfigMapReference
-	}
-	tests := []struct {
-		name  string
-		args  args
-		want  []corev1.Volume
-		want1 []corev1.VolumeMount
-	}{
-		{
-			name: "test mount configmaps",
-			args: args{
-				configmaps: []v1.ConfigMapReference{
-					{
-						Name:      "s1",
-						MountPath: "/pkg/mounts/volumes1",
-					},
-					{
-						Name:      "s2",
-						MountPath: "/pkg/mounts/volumes2",
-					},
-				},
-			},
-			want: []corev1.Volume{
-				{
-					Name: "s1-1614",
-					VolumeSource: corev1.VolumeSource{
-						ConfigMap: &corev1.ConfigMapVolumeSource{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "s1",
-							},
-						},
-					},
-				},
-				{
-					Name: "s2-1229",
-					VolumeSource: corev1.VolumeSource{
-						ConfigMap: &corev1.ConfigMapVolumeSource{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "s2",
-							},
-						},
-					},
-				},
-			},
-			want1: []corev1.VolumeMount{
-				{
-					Name:      "s1-1614",
-					MountPath: "/pkg/mounts/volumes1",
-				},
-				{
-					Name:      "s2-1229",
-					MountPath: "/pkg/mounts/volumes2",
-				},
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, got1 := MountConfigMaps(nil, tt.args.volumes, tt.args.volumeMounts, tt.args.configmaps)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("MountSecrets() got = %v, want %v", got, tt.want)
 			}
@@ -422,4 +302,56 @@ func TestSpecialStorageClassName(t *testing.T) {
 			}
 		})
 	}
+}
+
+func specWithReadOnlyRootFilesystem(readOnly bool) v1.SpecInterface {
+	return &v1.StarRocksFeSpec{
+		StarRocksComponentSpec: v1.StarRocksComponentSpec{
+			ReadOnlyRootFilesystem: &readOnly,
+		},
+	}
+}
+
+// Every mounted Secret gets SecretFileMode, whatever it carries and however it is mounted: a whole
+// directory, or a single file with a subPath next to a command of the deployment's own.
+func TestMountSecretsAlwaysReadOnly(t *testing.T) {
+	secrets := []v1.SecretReference{
+		{Name: "script", MountPath: "/opt/starrocks/entrypoint.sh", SubPath: "entrypoint.sh"},
+		{Name: "keytab", MountPath: "/etc/security/keytabs"},
+	}
+
+	volumes, _ := MountSecrets(nil, nil, secrets)
+
+	require.Equal(t, 2, len(volumes))
+	for i := range volumes {
+		require.Equal(t, secretFileMode, *volumes[i].Secret.DefaultMode)
+	}
+}
+
+func TestMountWritableTmpDir(t *testing.T) {
+	t.Run("mounted for a read-only root filesystem", func(t *testing.T) {
+		volumes, volumeMounts := MountWritableTmpDir(specWithReadOnlyRootFilesystem(true), nil, nil)
+		require.Equal(t, 1, len(volumes))
+		require.NotNil(t, volumes[0].EmptyDir)
+		require.Equal(t, 1, len(volumeMounts))
+		require.Equal(t, WritableTmpDir, volumeMounts[0].MountPath)
+		require.Equal(t, volumes[0].Name, volumeMounts[0].Name)
+	})
+
+	t.Run("not mounted for a writable root filesystem", func(t *testing.T) {
+		volumes, volumeMounts := MountWritableTmpDir(specWithReadOnlyRootFilesystem(false), nil, nil)
+		require.Equal(t, 0, len(volumes))
+		require.Equal(t, 0, len(volumeMounts))
+	})
+
+	t.Run("not mounted when the deployment mounts /tmp itself", func(t *testing.T) {
+		existingVolumes := []corev1.Volume{{Name: "my-tmp"}}
+		existingMounts := []corev1.VolumeMount{{Name: "my-tmp", MountPath: WritableTmpDir}}
+
+		volumes, volumeMounts := MountWritableTmpDir(specWithReadOnlyRootFilesystem(true),
+			existingVolumes, existingMounts)
+
+		require.Equal(t, existingVolumes, volumes)
+		require.Equal(t, existingMounts, volumeMounts)
+	})
 }

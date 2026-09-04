@@ -105,71 +105,41 @@ func MountHostPathVolume(volumes []corev1.Volume, volumeMounts []corev1.VolumeMo
 	return volumes, volumeMounts
 }
 
-func MountConfigMaps(spec v1.SpecInterface, volumes []corev1.Volume, volumeMounts []corev1.VolumeMount,
-	references []v1.ConfigMapReference) ([]corev1.Volume, []corev1.VolumeMount) {
-	prerequisitesOfChangingMode := spec != nil && (spec.GetCommand() != nil || spec.GetArgs() != nil)
+// WritableTmpDir is the one path a container with a read-only root filesystem can write to: the start
+// scripts put the pid file there and the JVM uses it as java.io.tmpdir.
+const WritableTmpDir = "/tmp"
 
-	for _, reference := range references {
-		volumeName := getVolumeName(v1.MountInfo(reference))
-		volumes = append(volumes, corev1.Volume{
-			Name: volumeName,
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: reference.Name,
-					},
-					DefaultMode: func() *int32 {
-						if prerequisitesOfChangingMode && reference.SubPath != "" {
-							const executionPermission = int32(0755)
-							v := executionPermission
-							return &v
-						}
-						return nil
-					}(),
-				},
-			},
-		})
-		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      volumeName,
-			MountPath: reference.MountPath,
-			SubPath:   reference.SubPath,
-		})
+const tmpVolumeName = "starrocks-tmp"
+
+// MountWritableTmpDir mounts an emptyDir at WritableTmpDir when the container runs with a read-only root
+// filesystem and the deployment does not mount something there itself.
+func MountWritableTmpDir(spec v1.SpecInterface, volumes []corev1.Volume,
+	volumeMounts []corev1.VolumeMount) ([]corev1.Volume, []corev1.VolumeMount) {
+	if !IsReadOnlyRootFilesystem(spec) {
+		return volumes, volumeMounts
 	}
-	return volumes, volumeMounts
+	for i := range volumeMounts {
+		if volumeMounts[i].MountPath == WritableTmpDir {
+			return volumes, volumeMounts
+		}
+	}
+	return MountEmptyDirVolume(volumes, volumeMounts, tmpVolumeName, WritableTmpDir, "")
 }
 
-// MountConfigMapInfo parse ConfigMapInfo from spec and mount them to pod.
-// Note: we can not reuse MountConfigMaps because it generates a volume name by call getVolumeName,
-func MountConfigMapInfo(volumes []corev1.Volume, volumeMounts []corev1.VolumeMount,
-	cmInfo v1.ConfigMapInfo, mountPath string) ([]corev1.Volume, []corev1.VolumeMount) {
-	if cmInfo.ConfigMapName != "" && cmInfo.ResolveKey != "" {
-		volumes = append(volumes, corev1.Volume{
-			Name: cmInfo.ConfigMapName,
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: cmInfo.ConfigMapName,
-					},
-				},
-			},
-		})
-		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      cmInfo.ConfigMapName,
-			MountPath: mountPath,
-		})
-	}
-	return volumes, volumeMounts
-}
-
+// MountSecrets parse Secrets from spec and mount them to pod.
+// The files are mounted with SecretFileMode, so that the credentials a Secret carries are not readable
+// by every user of the container.
 func MountSecrets(volumes []corev1.Volume, volumeMounts []corev1.VolumeMount,
 	references []v1.SecretReference) ([]corev1.Volume, []corev1.VolumeMount) {
 	for _, reference := range references {
 		volumeName := getVolumeName(v1.MountInfo(reference))
+		mode := v1.SecretFileMode
 		volumes = append(volumes, corev1.Volume{
 			Name: volumeName,
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: reference.Name,
+					SecretName:  reference.Name,
+					DefaultMode: &mode,
 				},
 			},
 		})

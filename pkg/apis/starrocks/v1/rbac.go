@@ -24,9 +24,7 @@ package v1
 // This file intentionally contains only +kubebuilder:rbac markers and no Go code.
 
 // +kubebuilder:rbac:namespace="{{ . }}",groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
-// TODO: AD use secrets instead configmaps
-// +kubebuilder:rbac:namespace="{{ . }}",groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:namespace="{{ . }}",groups=core,resources=secrets,verbs=get;list;watch
+// +kubebuilder:rbac:namespace="{{ . }}",groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:namespace="{{ . }}",groups=core,resources=serviceaccounts,verbs=get;list;watch
 // +kubebuilder:rbac:namespace="{{ . }}",groups=core,resources=pods,verbs=get;list;watch
 // TODO: AD apps/v1 expose pod endpoints by selectorLabels

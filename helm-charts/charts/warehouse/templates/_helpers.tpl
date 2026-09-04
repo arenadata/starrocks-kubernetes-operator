@@ -11,8 +11,16 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
-{{- define "starrockswarehouse.configmap.name" -}}
-{{- print (include "starrockswarehouse.name" .) "-cm" }}
+{{- define "starrockswarehouse.config.secret.name" -}}
+{{- print (include "starrockswarehouse.name" .) "-conf" }}
+{{- end }}
+
+{{/*
+The directory the compute nodes read their configuration from. It has to match the one the operator
+derives from STARROCKS_ROOT, otherwise the operator can not read the ports out of the configuration.
+*/}}
+{{- define "starrockswarehouse.conf.dir" -}}
+{{- print "/opt/starrocks/cn/conf" }}
 {{- end }}
 
 {{- define "starrockswarehouse.config" -}}

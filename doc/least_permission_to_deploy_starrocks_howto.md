@@ -29,7 +29,6 @@ rules:
     resources:
       - secrets
       - serviceaccounts
-      - configmaps
     verbs:
       - '*'
   - apiGroups:

@@ -120,35 +120,36 @@ func ApplyDeployment(ctx context.Context, k8sClient client.Client, deploy *appsv
 	return PatchByThreeWayMerge(ctx, k8sClient, deploy, &actual)
 }
 
-func ApplyConfigMap(ctx context.Context, k8sClient client.Client, configmap *corev1.ConfigMap) error {
+// ApplySecret creates the secret when it does not exist, and updates it when its content differs.
+func ApplySecret(ctx context.Context, k8sClient client.Client, secret *corev1.Secret) error {
 	logger := logr.FromContextOrDiscard(ctx)
-	logger.Info("create or update configmap", "name", configmap.Name)
+	logger.Info("create or update secret", "name", secret.Name)
 
-	var actual corev1.ConfigMap
-	err := k8sClient.Get(ctx, types.NamespacedName{Name: configmap.Name, Namespace: configmap.Namespace}, &actual)
+	var actual corev1.Secret
+	err := k8sClient.Get(ctx, types.NamespacedName{Name: secret.Name, Namespace: secret.Namespace}, &actual)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return CreateClientObject(ctx, k8sClient, configmap)
+			return CreateClientObject(ctx, k8sClient, secret)
 		}
 		return err
 	}
 
-	equal := func(configmap, actual *corev1.ConfigMap) bool {
-		if len(configmap.Data) != len(actual.Data) {
+	equal := func(secret, actual *corev1.Secret) bool {
+		if len(secret.Data) != len(actual.Data) {
 			return false
 		}
-		for k, v := range configmap.Data {
-			if actual.Data[k] != v {
+		for k, v := range secret.Data {
+			if !bytes.Equal(actual.Data[k], v) {
 				return false
 			}
 		}
 		return true
 	}
 
-	// the hash value calculated from ConfigMap instance in k8s may will never equal to the hash value from
-	// starrocks cluster. Because ConfigMap instance may be updated by k8s controller manager.
-	if !equal(configmap, &actual) {
-		return UpdateClientObject(ctx, k8sClient, configmap)
+	// the hash value calculated from the Secret instance in k8s may never equal the hash value from the
+	// starrocks cluster, because the Secret instance may be updated by the k8s controller manager.
+	if !equal(secret, &actual) {
+		return UpdateClientObject(ctx, k8sClient, secret)
 	}
 	return nil
 }
@@ -350,19 +351,19 @@ func DeleteDeployment(ctx context.Context, k8sClient client.Client, namespace, n
 	return k8sClient.Delete(ctx, &deploy)
 }
 
-// DeleteConfigMap delete configmap.
-func DeleteConfigMap(ctx context.Context, k8sClient client.Client, namespace, name string) error {
+// DeleteSecret delete secret.
+func DeleteSecret(ctx context.Context, k8sClient client.Client, namespace, name string) error {
 	logger := logr.FromContextOrDiscard(ctx)
-	logger.Info("delete configmap from kubernetes", "name", name)
+	logger.Info("delete secret from kubernetes", "name", name)
 
-	var cm corev1.ConfigMap
-	if err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, &cm); apierrors.IsNotFound(err) {
+	var secret corev1.Secret
+	if err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, &secret); apierrors.IsNotFound(err) {
 		return nil
 	} else if err != nil {
 		return err
 	}
 
-	return k8sClient.Delete(ctx, &cm)
+	return k8sClient.Delete(ctx, &secret)
 }
 
 func DeleteAutoscaler(ctx context.Context, k8sClient client.Client, namespace, name string, version srapi.AutoScalerVersion) error {
@@ -407,17 +408,17 @@ func PodIsReady(status *corev1.PodStatus) bool {
 	return true
 }
 
-// GetConfigMap get the configmap name=name, namespace=namespace.
-func GetConfigMap(ctx context.Context, k8scient client.Client, namespace, name string) (*corev1.ConfigMap, error) {
+// GetSecret get the secret name=name, namespace=namespace.
+func GetSecret(ctx context.Context, k8scient client.Client, namespace, name string) (*corev1.Secret, error) {
 	logger := logr.FromContextOrDiscard(ctx)
-	logger.Info("fetch configmap from kubernetes", "name", name)
+	logger.Info("fetch secret from kubernetes", "name", name)
 
-	var configMap corev1.ConfigMap
-	if err := k8scient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, &configMap); err != nil {
+	var secret corev1.Secret
+	if err := k8scient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, &secret); err != nil {
 		return nil, err
 	}
 
-	return &configMap, nil
+	return &secret, nil
 }
 
 var (
@@ -480,41 +481,18 @@ func GetEnvVarValue(ctx context.Context, k8sClient client.Client, namespace stri
 	} else if envVar.ValueFrom != nil {
 		// If ValueFrom is not nil, handle different sources
 		valueFrom := envVar.ValueFrom
-		if valueFrom.ConfigMapKeyRef != nil {
-			// If ConfigMapKeyRef is not nil, get the value from the configmap's key
-			name := valueFrom.ConfigMapKeyRef.Name
-			key := valueFrom.ConfigMapKeyRef.Key
-			return GetValueFromConfigmap(ctx, k8sClient, namespace, name, key)
-		} else if valueFrom.SecretKeyRef != nil {
+		if valueFrom.SecretKeyRef != nil {
 			// If SecretKeyRef is not nil, get the value from the secret's key
 			name := valueFrom.SecretKeyRef.Name
 			key := valueFrom.SecretKeyRef.Key
 			return GetValueFromSecret(ctx, k8sClient, namespace, name, key)
 		}
+		if valueFrom.ConfigMapKeyRef != nil {
+			return "", fmt.Errorf("variables from configmap is not supported")
+		}
 	}
+
 	return "", fmt.Errorf("invalid environment variable: %v", envVar)
-}
-
-// GetValueFromConfigmap returns the runtime value of a key in a configmap.
-// It assumes that the configmap and the key exist and are valid.
-func GetValueFromConfigmap(ctx context.Context, k8sClient client.Client, namespace string, name string, key string) (string, error) {
-	logger := logr.FromContextOrDiscard(ctx)
-	logger.Info("fetch configmap from kubernetes", "name", name, "configmap-key", key)
-
-	var configMap corev1.ConfigMap
-	err := k8sClient.Get(ctx,
-		types.NamespacedName{
-			Name:      name,
-			Namespace: namespace,
-		}, &configMap)
-	if err != nil {
-		return "", err
-	}
-	value, ok := configMap.Data[key]
-	if !ok {
-		return "", fmt.Errorf("key %s not found in configmap %s", key, name)
-	}
-	return value, nil
 }
 
 // GetValueFromSecret returns the value of a key in a secret.
@@ -599,40 +577,42 @@ func CheckVolumes(volumes []corev1.Volume, mounts []corev1.VolumeMount) error {
 	return nil
 }
 
-// GetConfig get the config of component.
-// First, It tries to read the config from the ConfigMapInfo, which has the configMap name and key.
-// Second, if the ConfigMapInfo is empty, it will try to read the config from the ConfigMaps.
-// Last, If the fe ConfigMapInfo is empty and the configMaps is nil, it will return an empty map.
+// GetConfig get the config of component. The configuration is delivered by a Secret, which is mounted
+// over the conf directory of the installation or, with a subPath, over a single file in it.
+// If no Secret mounts the config file, it returns an empty map.
 func GetConfig(ctx context.Context, k8sClient client.Client,
-	configMapInfo srapi.ConfigMapInfo,
-	configMaps []srapi.ConfigMapReference, expectMountPath, expectKey string,
+	secrets []srapi.SecretReference,
+	expectMountPath, expectKey string,
 	namespace string) (map[string]interface{}, error) {
-	if configMapInfo.ConfigMapName != "" || configMapInfo.ResolveKey != "" {
-		if configMapInfo.ConfigMapName == "" || configMapInfo.ResolveKey == "" {
+	mounts := make([]srapi.MountInfo, 0, len(secrets))
+	for i := range secrets {
+		mounts = append(mounts, srapi.MountInfo(secrets[i]))
+	}
+	name := findMountedName(mounts, expectMountPath, expectKey)
+	if name == "" {
+		return make(map[string]interface{}), nil
+	}
+
+	secret, err := GetSecret(ctx, k8sClient, namespace, name)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
 			return make(map[string]interface{}), nil
 		}
-		configMap, err := GetConfigMap(ctx, k8sClient, namespace, configMapInfo.ConfigMapName)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				return make(map[string]interface{}), nil
-			}
-			return nil, err
-		}
-
-		res, err := ResolveConfigMap(configMap, configMapInfo.ResolveKey)
-		return res, err
+		return nil, err
 	}
-	return getConfigFromConfigMaps(ctx, k8sClient, configMaps, expectMountPath, expectKey, namespace)
+	return ResolveSecret(secret, expectKey)
 }
 
-func ResolveConfigMap(configMap *corev1.ConfigMap, key string) (map[string]interface{}, error) {
-	res := make(map[string]interface{})
-	data := configMap.Data
-	if _, ok := data[key]; !ok {
-		return res, nil
+// ResolveSecret parses the config file stored under key in the secret.
+func ResolveSecret(secret *corev1.Secret, key string) (map[string]interface{}, error) {
+	value, ok := secret.Data[key]
+	if !ok {
+		return make(map[string]interface{}), nil
 	}
-	value := data[key]
+	return resolveConfig(string(value))
+}
 
+func resolveConfig(value string) (map[string]interface{}, error) {
 	// We use a new viper instance, not the global one, in order to avoid concurrency problems: concurrent map iteration
 	// and map write.
 	// As of viper v1.20 the "properties" codec is no longer bundled, so register the externalized
@@ -649,39 +629,24 @@ func ResolveConfigMap(configMap *corev1.ConfigMap, key string) (map[string]inter
 	return v.AllSettings(), nil
 }
 
-// getConfigFromConfigMaps try to read the config from the configMaps. The strategy is to match
-// the mountPath with expectMountPath.
+// findMountedName returns the name of the Secret that provides expectKey under
+// expectMountPath. The strategy is to match the mountPath with expectMountPath.
 //   - if subpath is empty, the mount path should equal to expectMountPath. And it will use expectKey as the key.
 //   - if subpath is not empty, it should equal to expectKey, and the mount path should be expectMountPath/expectKey.
-func getConfigFromConfigMaps(ctx context.Context, k8sClient client.Client,
-	configMaps []srapi.ConfigMapReference, expectMountPath, expectKey string,
-	namespace string) (map[string]interface{}, error) {
-	configMapName := ""
-	for i := range configMaps {
-		subPath := configMaps[i].SubPath
+func findMountedName(mounts []srapi.MountInfo, expectMountPath, expectKey string) string {
+	name := ""
+	for i := range mounts {
+		subPath := mounts[i].SubPath
 		if subPath == "" {
-			if configMaps[i].MountPath == expectMountPath {
-				configMapName = configMaps[i].Name
-				// don't break here, we need to use the ConfigMapReference with the subPath first.
+			if mounts[i].MountPath == expectMountPath {
+				name = mounts[i].Name
+				// don't break here, we need to use the reference with the subPath first.
 			}
 		} else {
-			if configMaps[i].MountPath == filepath.Join(expectMountPath, expectKey) && expectKey == subPath {
-				configMapName = configMaps[i].Name
-				break
+			if mounts[i].MountPath == filepath.Join(expectMountPath, expectKey) && expectKey == subPath {
+				return mounts[i].Name
 			}
 		}
 	}
-	if configMapName == "" {
-		return make(map[string]interface{}), nil
-	}
-
-	configMap, err := GetConfigMap(ctx, k8sClient, namespace, configMapName)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return make(map[string]interface{}), nil
-		}
-		return nil, err
-	}
-	res, err := ResolveConfigMap(configMap, expectKey)
-	return res, err
+	return name
 }

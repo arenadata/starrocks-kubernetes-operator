@@ -90,9 +90,9 @@ func (controller *FeProxyController) SyncCluster(ctx context.Context, src *srapi
 		}
 	}()
 
-	err = controller.SyncConfigMap(ctx, src)
+	err = controller.SyncSecret(ctx, src)
 	if err != nil {
-		logger.Error(err, "sync fe proxy configmap failed", "StarRocksCluster", src)
+		logger.Error(err, "sync fe proxy secret failed", "StarRocksCluster", src)
 		return err
 	}
 
@@ -183,9 +183,9 @@ func (controller *FeProxyController) ClearCluster(ctx context.Context, src *srap
 		return err
 	}
 
-	configMapName := load.Name(src.Name, feProxySpec)
-	if err := k8sutils.DeleteConfigMap(ctx, controller.k8sClient, src.Namespace, configMapName); err != nil {
-		logger.Error(err, "delete fe proxy configmap failed", "StarRocksCluster", src)
+	secretName := load.Name(src.Name, feProxySpec)
+	if err := k8sutils.DeleteSecret(ctx, controller.k8sClient, src.Namespace, secretName); err != nil {
+		logger.Error(err, "delete fe proxy secret failed", "StarRocksCluster", src)
 		return err
 	}
 
@@ -196,7 +196,7 @@ func (controller *FeProxyController) buildPodTemplate(src *srapi.StarRocksCluste
 	feProxySpec := src.Spec.StarRocksFeProxySpec
 	vols, volumeMounts := pod.MountStorageVolumes(feProxySpec)
 
-	vols, volumeMounts = pod.MountConfigMaps(feProxySpec, vols, volumeMounts, []srapi.ConfigMapReference{
+	vols, volumeMounts = pod.MountSecrets(vols, volumeMounts, []srapi.SecretReference{
 		{
 			Name:      load.Name(src.Name, feProxySpec),
 			MountPath: "/etc/nginx",
@@ -221,8 +221,8 @@ func (controller *FeProxyController) buildPodTemplate(src *srapi.StarRocksCluste
 	}
 
 	// nginx container will run as nginx user, not allowed to change
-	var userID int64 = 101
-	var groupID int64 = 101
+	userID := srapi.NginxUserID
+	groupID := srapi.NginxGroupID
 	runAsNonRoot := true
 	container.SecurityContext = &corev1.SecurityContext{
 		RunAsUser:                &userID,
@@ -234,6 +234,9 @@ func (controller *FeProxyController) buildPodTemplate(src *srapi.StarRocksCluste
 	}
 
 	podSpec := pod.Spec(feProxySpec, container, vols)
+	// nginx reads its configuration from a Secret mounted with SecretFileMode, which is only readable
+	// for the group the pod declares as FSGroup
+	podSpec.SecurityContext = pod.PodSecurityContext(feProxySpec)
 	return corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: feProxySpec.GetAnnotations(),

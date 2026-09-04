@@ -168,12 +168,12 @@ func (cc *CnController) SyncCnSpec(ctx context.Context, object object.StarRocksO
 		return err
 	}
 
-	logger.V(log.DebugLevel).Info("get cn config to resolve ports", "ConfigMapInfo", cnSpec.ConfigMapInfo)
+	logger.V(log.DebugLevel).Info("get cn config to resolve ports", "secrets", cnSpec.Secrets)
 	cnConfig, err := cc.GetCnConfig(ctx, cnSpec, object.Namespace)
 	if err != nil {
 		return err
 	}
-	logger.V(log.DebugLevel).Info("get fe config to resolve ports", "ConfigMapInfo", cnSpec.ConfigMapInfo)
+	logger.V(log.DebugLevel).Info("get fe config to resolve ports", "secrets", cnSpec.Secrets)
 	feconfig, err := cc.getFeConfig(ctx, object.Namespace, object.ClusterName)
 	if err != nil {
 		return err
@@ -483,8 +483,7 @@ func (cc *CnController) ClearCluster(ctx context.Context, src *srapi.StarRocksCl
 
 func (cc *CnController) GetCnConfig(ctx context.Context,
 	cnSpec *srapi.StarRocksCnSpec, namespace string) (map[string]interface{}, error) {
-	return k8sutils.GetConfig(ctx, cc.k8sClient, cnSpec.ConfigMapInfo,
-		cnSpec.ConfigMaps, pod.GetConfigDir(cnSpec), "cn.conf",
+	return k8sutils.GetConfig(ctx, cc.k8sClient, cnSpec.Secrets, pod.GetConfigDir(cnSpec), "cn.conf",
 		namespace)
 }
 

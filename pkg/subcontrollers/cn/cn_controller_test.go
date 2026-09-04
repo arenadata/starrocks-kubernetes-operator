@@ -175,11 +175,8 @@ func Test_SyncWarehouse(t *testing.T) {
 		Spec: srapi.StarRocksClusterSpec{
 			StarRocksFeSpec: &srapi.StarRocksFeSpec{
 				StarRocksComponentSpec: srapi.StarRocksComponentSpec{
-					StarRocksLoadSpec: srapi.StarRocksLoadSpec{
-						ConfigMapInfo: srapi.ConfigMapInfo{
-							ConfigMapName: "fe-configMap",
-							ResolveKey:    "fe.conf",
-						},
+					Secrets: []srapi.SecretReference{
+						{Name: "fe-configMap", MountPath: "/opt/starrocks/fe/conf"},
 					},
 				},
 			},
@@ -195,13 +192,13 @@ func Test_SyncWarehouse(t *testing.T) {
 	}
 
 	// fe should run in shared_data mode
-	feConfigMap := &corev1.ConfigMap{
+	feConfigMap := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "fe-configMap",
 			Namespace: "default",
 		},
-		Data: map[string]string{
-			"fe.conf": "run_mode = shared_data",
+		Data: map[string][]byte{
+			"fe.conf": []byte("run_mode = shared_data"),
 		},
 	}
 
@@ -405,19 +402,19 @@ func TestCnController_GetCnConfig(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "get CN config from ConfigMapInfo",
+			name: "get CN config from a secret, with matching subpath",
 			fields: fields{
-				k8sClient: fake.NewFakeClient(srapi.Scheme, &corev1.ConfigMap{
+				k8sClient: fake.NewFakeClient(srapi.Scheme, &corev1.Secret{
 					TypeMeta: metav1.TypeMeta{
-						Kind:       "ConfigMap",
+						Kind:       "Secret",
 						APIVersion: corev1.SchemeGroupVersion.String(),
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "cn-configMap",
 						Namespace: "default",
 					},
-					Data: map[string]string{
-						"cn.conf": "aa = bb",
+					Data: map[string][]byte{
+						"cn.conf": []byte("cc = dd"),
 					},
 				}),
 			},
@@ -425,43 +422,7 @@ func TestCnController_GetCnConfig(t *testing.T) {
 				ctx: context.Background(),
 				cnSpec: &srapi.StarRocksCnSpec{
 					StarRocksComponentSpec: srapi.StarRocksComponentSpec{
-						StarRocksLoadSpec: srapi.StarRocksLoadSpec{
-							ConfigMapInfo: srapi.ConfigMapInfo{
-								ConfigMapName: "cn-configMap",
-								ResolveKey:    "cn.conf",
-							},
-						},
-						ConfigMaps: nil,
-					},
-				},
-				namespace: "default",
-			},
-			want: map[string]interface{}{
-				"aa": "bb",
-			},
-		},
-		{
-			name: "get CN config from configMaps, with matching subpath",
-			fields: fields{
-				k8sClient: fake.NewFakeClient(srapi.Scheme, &corev1.ConfigMap{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       "ConfigMap",
-						APIVersion: corev1.SchemeGroupVersion.String(),
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cn-configMap",
-						Namespace: "default",
-					},
-					Data: map[string]string{
-						"cn.conf": "cc = dd",
-					},
-				}),
-			},
-			args: args{
-				ctx: context.Background(),
-				cnSpec: &srapi.StarRocksCnSpec{
-					StarRocksComponentSpec: srapi.StarRocksComponentSpec{
-						ConfigMaps: []srapi.ConfigMapReference{
+						Secrets: []srapi.SecretReference{
 							{
 								Name:      "cn-configMap",
 								MountPath: "/opt/starrocks/cn/conf/cn.conf",
@@ -477,19 +438,19 @@ func TestCnController_GetCnConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "get CN config from configMap 2, without subpath",
+			name: "get CN config from a secret, without subpath",
 			fields: fields{
-				k8sClient: fake.NewFakeClient(srapi.Scheme, &corev1.ConfigMap{
+				k8sClient: fake.NewFakeClient(srapi.Scheme, &corev1.Secret{
 					TypeMeta: metav1.TypeMeta{
-						Kind:       "ConfigMap",
+						Kind:       "Secret",
 						APIVersion: corev1.SchemeGroupVersion.String(),
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "cn-configMap",
 						Namespace: "default",
 					},
-					Data: map[string]string{
-						"cn.conf": "cc = dd",
+					Data: map[string][]byte{
+						"cn.conf": []byte("cc = dd"),
 					},
 				}),
 			},
@@ -497,7 +458,7 @@ func TestCnController_GetCnConfig(t *testing.T) {
 				ctx: context.Background(),
 				cnSpec: &srapi.StarRocksCnSpec{
 					StarRocksComponentSpec: srapi.StarRocksComponentSpec{
-						ConfigMaps: []srapi.ConfigMapReference{
+						Secrets: []srapi.SecretReference{
 							{
 								Name:      "cn-configMap",
 								MountPath: "/opt/starrocks/cn/conf",

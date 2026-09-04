@@ -31,21 +31,33 @@ var _ SpecInterface = &StarRocksComponentSpec{}
 type StarRocksComponentSpec struct {
 	StarRocksLoadSpec `json:",inline"`
 
+	// SecurityContext holds the security settings of the StarRocks container. Every field set here wins
+	// over what the operator derives from the deprecated shortcuts below, everything else keeps its
+	// default, so that a deployment can express what its policy requires - a seccomp profile, dropping
+	// all capabilities, a specific user - without the operator having to know about the field.
+	// See https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+	// +optional
+	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
+
+	// PodSecurityContext holds the security settings of the pod, applied the same way as SecurityContext.
+	// Note that the operator sets FSGroup by default: the configuration and the other Secrets are mounted
+	// with mode 0440 and belong to that group, without it the StarRocks process can not read them.
+	// +optional
+	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
+
 	// RunAsNonRoot is used to determine whether to run starrocks as a normal user.
 	// If RunAsNonRoot is true, operator will set RunAsUser and RunAsGroup to 1000 in securityContext.
 	// default: nil
+	// Deprecated: set runAsUser/runAsGroup/runAsNonRoot in SecurityContext instead.
 	RunAsNonRoot *bool `json:"runAsNonRoot,omitempty"`
 
 	// refer to https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-capabilities-for-a-container
 	// grant certain privileges to a process without granting all the privileges of the root user
+	// Deprecated: set capabilities in SecurityContext instead.
 	// +optional
 	Capabilities *corev1.Capabilities `json:"capabilities,omitempty"`
 
-	// the reference for configMap which allow users to mount any files to container.
-	// +optional
-	ConfigMaps []ConfigMapReference `json:"configMaps,omitempty"`
-
-	// the reference for secrets.
+	// the reference for secrets, which allow users to mount any files to container.
 	// +optional
 	Secrets []SecretReference `json:"secrets,omitempty"`
 
@@ -110,13 +122,20 @@ type StarRocksComponentSpec struct {
 	// Default is false.
 	// Note that:
 	// 	1. This field cannot be set when spec.os.name is windows.
-	//	2. The FE/BE/CN container should support read-only root filesystem. The newest version of FE/BE/CN is 3.3.6,
-	//     and does not support read-only root filesystem
+	//	2. The image has to keep its configuration directory read-only and write its pid file outside of
+	//     the installation. StarRocks images do so since 4.4.0/4.0.10.1; with an older image the
+	//     components fail to start or silently ignore the mounted configuration.
+	//	3. When it is enabled the operator mounts an emptyDir at /tmp and points PID_DIR (and
+	//     UDF_RUNTIME_DIR for BE/CN) at it. Anything else the deployment writes to - the spill
+	//     directory, small files, FE tmp_dir - has to be pointed at a volume in the configuration.
+	// Deprecated: set readOnlyRootFilesystem in SecurityContext instead, the operator honors it there
+	// as well.
 	// +optional
 	ReadOnlyRootFilesystem *bool `json:"readOnlyRootFilesystem,omitempty" protobuf:"varint,6,opt,name=readOnlyRootFilesystem"`
 
 	// Sysctls defines a list of namespaced sysctls for the podSecurityContext.sysctls
 	// See https://kubernetes.io/docs/tasks/administer-cluster/sysctl-cluster/ for more details.
+	// Deprecated: set sysctls in PodSecurityContext instead.
 	Sysctls []corev1.Sysctl `json:"sysctls,omitempty"`
 
 	// PersistentVolumeClaimRetentionPolicy specifies the retention policy for PersistentVolumeClaims associated with the component.
@@ -163,28 +182,37 @@ type StarRocksComponentStatus struct {
 	Reason string `json:"reason,omitempty"`
 }
 
-type ConfigMapInfo struct {
-	// the config info for start progress.
-	ConfigMapName string `json:"configMapName,omitempty"`
-
-	// the config response key in configmap.
-	ResolveKey string `json:"resolveKey,omitempty"`
-}
-
-type ConfigMapReference MountInfo
-
 type SecretReference MountInfo
+
+const (
+	// StarRocksUserID and StarRocksGroupID are the user and the group the StarRocks images create and run
+	// with. The operator sets the group as PodSecurityContext.FSGroup for every component, so that the
+	// mounted Secrets belong to a group the process is a member of, see SecretFileMode.
+	StarRocksUserID  int64 = 1000
+	StarRocksGroupID int64 = 1000
+
+	// NginxUserID and NginxGroupID are the user and the group the nginx image of the FE proxy runs with.
+	// The operator sets the group as PodSecurityContext.FSGroup of the FE proxy, so that nginx can read
+	// its configuration Secret, which is mounted with SecretFileMode.
+	NginxUserID  int64 = 101
+	NginxGroupID int64 = 101
+
+	// SecretFileMode is the permission the files of a mounted Secret get in the container. Kubernetes
+	// defaults to 0644, which makes the credentials a Secret carries - the LDAP bind password, keystore
+	// passwords, a Kerberos keytab, and the StarRocks configuration itself - readable by every user of
+	// the container. The files belong to root and to the group of PodSecurityContext.FSGroup, which the
+	// operator always sets, so 0440 still leaves them readable for the StarRocks process.
+	SecretFileMode int32 = 0o440
+)
 
 // MountInfo
 // The reason why we do not support defaultMode is that we use hash.HashObject to
 // calculate the actual volume name. This volume name is used in pod template of statefulset,
 // and if this MountInfo type has been changed, the volume name will be changed too, and
 // that will make pods restart.
-// The default mode is 0644, and in order to support to set permission information for a configMap
-// or secret, we add should specify the subPath and specify a command or args in the container.
-// And It will be set 0755.
+// The permissions of the mounted files are decided by the operator instead, see SecretFileMode.
 type MountInfo struct {
-	// This must match the Name of a ConfigMap or Secret in the same namespace, and
+	// This must match the Name of a Secret in the same namespace, and
 	// the length of name must not more than 50 characters.
 	Name string `json:"name,omitempty"`
 
@@ -208,8 +236,8 @@ func (spec *StarRocksComponentSpec) GetRunAsNonRoot() (*int64, *int64) {
 		return nil, nil
 	}
 
-	var userID int64 = 1000
-	var groupID int64 = 1000
+	userID := StarRocksUserID
+	groupID := StarRocksGroupID
 	return &userID, &groupID
 }
 
@@ -272,6 +300,14 @@ func ValidUpdateStrategy(updateStrategy *appsv1.StatefulSetUpdateStrategy) error
 		}
 	}
 	return nil
+}
+
+func (spec *StarRocksComponentSpec) GetSecurityContext() *corev1.SecurityContext {
+	return spec.SecurityContext
+}
+
+func (spec *StarRocksComponentSpec) GetPodSecurityContext() *corev1.PodSecurityContext {
+	return spec.PodSecurityContext
 }
 
 func (spec *StarRocksComponentSpec) IsReadOnlyRootFilesystem() *bool {

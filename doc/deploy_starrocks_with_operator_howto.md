@@ -11,7 +11,7 @@ It includes the following parts:
     1. Access StarRocks cluster
     2. Upgrade StarRocks cluster
     3. Scale StarRocks cluster
-    4. Using ConfigMap to configure your StarRocks cluster
+    4. Using a Secret to configure your StarRocks cluster
   
 > [!NOTE]  
 > The StarRocks k8s operator was designed to be a level 2 operator.   See https://sdk.operatorframework.io/docs/overview/operator-capabilities/ to understand more about the capabilities of a level 2 operator. 
@@ -273,40 +273,41 @@ FE nodes can be scaled-in, but there are some limitations:
 2. Each time less than half of the nodes can be scaled-in.
 3. You can't do 3->1 scale in.
 
-### 3.4. Using ConfigMap to configure your StarRocks cluster
+### 3.4. Using a Secret to configure your StarRocks cluster
 
-The official images contains default application configuration file, however, they can be overwritten by configuring
-kubernetes configmap deployment crd.
+The official images contain a default configuration file for every component. It is replaced by mounting a
+Secret over the conf directory of the installation, `/opt/starrocks/<component>/conf`. The operator mounts
+Secrets only: a configuration carries credentials - the LDAP bind password, the passwords of the keystores
+- and it is the same object the operator reads the ports of the component out of.
 
-You can generate the configmap from an StarRocks configuration file.
-Below is an example of creating a Kubernetes configmap `fe-config-map` from the `fe.conf` configuration file. You can do
-the same with BE and CN.
+You can generate the Secret from a StarRocks configuration file. Below is an example of creating the
+Secret `fe-config` from the `fe.conf` configuration file. You can do the same with BE and CN.
 
 ```console
-# create fe-config-map from starrocks/fe/conf/fe.conf file
-kubectl create configmap fe-config-map --from-file=starrocks/fe/conf/fe.conf
+# create fe-config from the starrocks/fe/conf/fe.conf file
+kubectl create secret generic fe-config --from-file=starrocks/fe/conf/fe.conf
 ```
 
-Once the configmap is created, you can reference the configmap in the yaml file.
-For example:
+Once the Secret is created, reference it in the yaml file by the directory it is mounted at:
 
 ```yaml
-# fe use configmap example
 starRocksFeSpec:
-  configMapInfo:
-    configMapName: fe-config-map
-    resolveKey: fe.conf
-# cn use configmap example
+  secrets:
+  - name: fe-config
+    mountPath: /opt/starrocks/fe/conf
+starRocksBeSpec:
+  secrets:
+  - name: be-config
+    mountPath: /opt/starrocks/be/conf
 starRocksCnSpec:
-  configMapInfo:
-    configMapName: cn-config-map
-    resolveKey: cn.conf
-  # be use configmap example
-  starRocksBeSpec:
-    configMapInfo:
-    configMapName: be-config-map
-    resolveKey: be.conf
+  secrets:
+  - name: cn-config
+    mountPath: /opt/starrocks/cn/conf
 ```
+
+Note that the mount replaces the conf directory as a whole, so the Secret has to carry every configuration
+file the component needs, starting with `fe.conf` / `be.conf` / `cn.conf`. The files are mounted read-only
+with mode 0440, owned by the group the operator sets as the `fsGroup` of the pod.
 
 ## FAQ
 

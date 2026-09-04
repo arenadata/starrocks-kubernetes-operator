@@ -58,10 +58,9 @@ func TestStarRocksClusterReconciler_BeResourceCreate(t *testing.T) {
 								corev1.ResourceMemory: resource.MustParse("16G"),
 							},
 						},
-						ConfigMapInfo: srapi.ConfigMapInfo{
-							ConfigMapName: "fe-configMap",
-							ResolveKey:    "fe.conf",
-						},
+					},
+					Secrets: []srapi.SecretReference{
+						{Name: "fe-configMap", MountPath: "/opt/starrocks/fe/conf"},
 					},
 				},
 			},
@@ -76,10 +75,9 @@ func TestStarRocksClusterReconciler_BeResourceCreate(t *testing.T) {
 								corev1.ResourceMemory: resource.MustParse("16G"),
 							},
 						},
-						ConfigMapInfo: srapi.ConfigMapInfo{
-							ConfigMapName: "be-configMap",
-							ResolveKey:    "be.conf",
-						},
+					},
+					Secrets: []srapi.SecretReference{
+						{Name: "be-configMap", MountPath: "/opt/starrocks/be/conf"},
 					},
 				},
 			},
@@ -99,29 +97,29 @@ func TestStarRocksClusterReconciler_BeResourceCreate(t *testing.T) {
 		}},
 	}
 
-	// mock the fe configMap
-	feConfigMap := &corev1.ConfigMap{
+	// mock the fe configuration secret
+	feConfSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "fe-configMap",
 			Namespace: "default",
 		},
-		Data: map[string]string{
-			"fe.conf": "hello = world",
+		Data: map[string][]byte{
+			"fe.conf": []byte("hello = world"),
 		},
 	}
 
-	// mock the cn configMap
-	beConfigMap := &corev1.ConfigMap{
+	// mock the be configuration secret
+	beConfSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "cn-configMap",
+			Name:      "be-configMap",
 			Namespace: "default",
 		},
-		Data: map[string]string{
-			"be.conf": "hello2 = world2",
+		Data: map[string][]byte{
+			"be.conf": []byte("hello2 = world2"),
 		},
 	}
 
-	r := newStarRocksClusterController(src, ep, feConfigMap, beConfigMap)
+	r := newStarRocksClusterController(src, ep, feConfSecret, beConfSecret)
 	res, err := r.Reconcile(context.Background(),
 		reconcile.Request{
 			NamespacedName: types.NamespacedName{

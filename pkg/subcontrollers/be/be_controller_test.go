@@ -200,19 +200,19 @@ func TestBeController_GetBeConfig(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "get BE config from ConfigMapInfo",
+			name: "get BE config from a secret, with matching subpath",
 			fields: fields{
-				k8sClient: fake.NewFakeClient(srapi.Scheme, &corev1.ConfigMap{
+				k8sClient: fake.NewFakeClient(srapi.Scheme, &corev1.Secret{
 					TypeMeta: metav1.TypeMeta{
-						Kind:       "ConfigMap",
+						Kind:       "Secret",
 						APIVersion: corev1.SchemeGroupVersion.String(),
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "be-configMap",
 						Namespace: "default",
 					},
-					Data: map[string]string{
-						"be.conf": "aa = bb",
+					Data: map[string][]byte{
+						"be.conf": []byte("cc = dd"),
 					},
 				}),
 			},
@@ -220,43 +220,7 @@ func TestBeController_GetBeConfig(t *testing.T) {
 				ctx: context.Background(),
 				beSpec: &srapi.StarRocksBeSpec{
 					StarRocksComponentSpec: srapi.StarRocksComponentSpec{
-						StarRocksLoadSpec: srapi.StarRocksLoadSpec{
-							ConfigMapInfo: srapi.ConfigMapInfo{
-								ConfigMapName: "be-configMap",
-								ResolveKey:    "be.conf",
-							},
-						},
-						ConfigMaps: nil,
-					},
-				},
-				namespace: "default",
-			},
-			want: map[string]interface{}{
-				"aa": "bb",
-			},
-		},
-		{
-			name: "get BE config from configMaps, with matching subpath",
-			fields: fields{
-				k8sClient: fake.NewFakeClient(srapi.Scheme, &corev1.ConfigMap{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       "ConfigMap",
-						APIVersion: corev1.SchemeGroupVersion.String(),
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "be-configMap",
-						Namespace: "default",
-					},
-					Data: map[string]string{
-						"be.conf": "cc = dd",
-					},
-				}),
-			},
-			args: args{
-				ctx: context.Background(),
-				beSpec: &srapi.StarRocksBeSpec{
-					StarRocksComponentSpec: srapi.StarRocksComponentSpec{
-						ConfigMaps: []srapi.ConfigMapReference{
+						Secrets: []srapi.SecretReference{
 							{
 								Name:      "be-configMap",
 								MountPath: "/opt/starrocks/be/conf/be.conf",
@@ -272,19 +236,19 @@ func TestBeController_GetBeConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "get BE config from configMap 2, without subpath",
+			name: "get BE config from a secret, without subpath",
 			fields: fields{
-				k8sClient: fake.NewFakeClient(srapi.Scheme, &corev1.ConfigMap{
+				k8sClient: fake.NewFakeClient(srapi.Scheme, &corev1.Secret{
 					TypeMeta: metav1.TypeMeta{
-						Kind:       "ConfigMap",
+						Kind:       "Secret",
 						APIVersion: corev1.SchemeGroupVersion.String(),
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "be-configMap",
 						Namespace: "default",
 					},
-					Data: map[string]string{
-						"be.conf": "cc = dd",
+					Data: map[string][]byte{
+						"be.conf": []byte("cc = dd"),
 					},
 				}),
 			},
@@ -292,7 +256,7 @@ func TestBeController_GetBeConfig(t *testing.T) {
 				ctx: context.Background(),
 				beSpec: &srapi.StarRocksBeSpec{
 					StarRocksComponentSpec: srapi.StarRocksComponentSpec{
-						ConfigMaps: []srapi.ConfigMapReference{
+						Secrets: []srapi.SecretReference{
 							{
 								Name:      "be-configMap",
 								MountPath: "/opt/starrocks/be/conf",
