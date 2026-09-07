@@ -1,10 +1,11 @@
 {{- if and .Values.starrocksOperator.enabled .Values.global.rbac.create }}
-{{- if .Values.starrocksOperator.watchNamespace }}
+{{- range .Values.payloadNamespaces.names }}
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: {{ template "operator.name" . }}-operator
-  namespace: {{ template "operator.namespace" . }}
+  namespace: {{ . }}
   labels:
     app: {{ template "operator.name" . }}-operator
 rules:
@@ -68,6 +69,5 @@ rules:
   - get
   - patch
   - update
-
 {{- end }}
 {{- end }}

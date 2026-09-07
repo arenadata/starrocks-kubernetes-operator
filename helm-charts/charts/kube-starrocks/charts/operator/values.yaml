@@ -78,13 +78,6 @@ starrocksOperator:
     #   operator: "Equal|Exists"
     #   value: "value"
     #   effect: "NoSchedule|PreferNoSchedule|NoExecute(1.6 only)"
-  # If specified, it will restrict operator to watch resources in the specified namespace. And
-  #  1. You must deploy your StarRocks cluster to the specified namespace.
-  #  2. You cannot assign multiple namespaces to watchNamespace field.
-  # Note: In most cases, you should not set this value. If your kubernetes cluster manages too many nodes, and
-  # the operator watching all namespaces uses too many memory resources, you can set this value.
-  # Defaults to all namespaces.
-  watchNamespace: ""
   # Additional operator container environment variables
   # You specify this manually like you would a raw deployment manifest.
   # Ref: https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/
@@ -105,3 +98,12 @@ starrocksOperator:
   # If users plan to use a sidecar or init container to mount the same volume, it will be challenging to get the volume name.
   # In this situation, you can set this value to false.
   volumeNameWithHash: true
+
+payloadNamespaces:
+  # Managed namespaces for Impala payload resources.
+  names: []
+
+metrics:
+  # Enable to protect the metrics endpoint with authn/authz. Requires ClusterRole.
+  # See https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.19.0/pkg/metrics/filters#WithAuthenticationAndAuthorization
+  auth: false

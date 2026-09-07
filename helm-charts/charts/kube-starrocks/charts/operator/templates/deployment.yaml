@@ -35,10 +35,14 @@ spec:
       - command:
         - /sroperator
         args:
-        - --leader-elect
-        {{- toYaml .Values.starrocksOperator.log | nindent 8 }}
-        {{- if .Values.starrocksOperator.watchNamespace }}
-        - --ns={{ .Values.starrocksOperator.watchNamespace }}
+        {{- range $.Values.payloadNamespaces.names }}
+        - -ns={{ . }}
+        {{- end }}
+        {{- if gt (or ( int $.Values.replicas) 1) 1 }}
+        - -leader-elect
+        {{- end }}
+        {{- if $.Values.metrics.auth }}
+        - -metrics-auth
         {{- end }}
         env:
         - name: TZ
